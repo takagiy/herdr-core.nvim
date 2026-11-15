@@ -6,7 +6,7 @@ vim.opt.runtimepath:append(vim.fn.getcwd())
 local version = "v0.18.0"
 local mini_test = "deps/mini.test-" .. version
 if vim.fn.isdirectory(mini_test) == 0 then
-    vim.system({
+    local result = vim.system({
         "git",
         "clone",
         "--quiet",
@@ -17,6 +17,9 @@ if vim.fn.isdirectory(mini_test) == 0 then
         "https://github.com/nvim-mini/mini.test",
         mini_test
     }):wait()
+    if result.code ~= 0 then
+        error(result.stderr)
+    end
 end
 vim.opt.runtimepath:append(mini_test)
 require("mini.test").setup()
