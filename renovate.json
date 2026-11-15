@@ -1,0 +1,20 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "The hc version the E2E runs against",
+      "managerFilePatterns": ["/^mise\\.toml$/"],
+      "matchStrings": ["HC_VERSION = \"(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "hc",
+      "datasourceTemplate": "custom.herdr-core"
+    }
+  ],
+  "customDatasources": {
+    "herdr-core": {
+      "defaultRegistryUrlTemplate": "https://releases.herdr.dev/core/latest.json",
+      "transformTemplates": ["{ \"releases\": [{ \"version\": version }] }"]
+    }
+  }
+}

@@ -48,7 +48,7 @@ GitHub Actions の Linux runner に `dbus`、`xvfb`、`xauth`、`dunst`、`libno
 
 ### hc の取得と失敗調査
 
-CI は [公式 latest.json](https://releases.herdr.dev/core/latest.json) を実行開始時に一度取得し、対象 OS の配布物と SHA-256 を解決する。検証してから専用ディレクトリに展開し、そのバイナリを使う。版とチェックサムを記録し、同じ実行の途中では更新しない。Windows では同梱の ConPTY も保持する。
+E2E は、`HC_VERSION` の版の公式の `manifest.json`（`https://releases.herdr.dev/core/<版>/manifest.json`）を取得し、対象 OS の配布物と SHA-256 を解決する。検証してから専用ディレクトリに展開し、そのバイナリを使う。版とチェックサムを記録し、同じ実行の途中では更新しない。Windows では同梱の ConPTY も保持する。
 
 GitHub Actions の `schedule` と `workflow_dispatch` を使い、記録した版・画面・ログは artifact に保存する。通常のテスト結果とは分ける。動作確認済み版での比較と任意の trace の範囲は、先の ADR に従う。
 
