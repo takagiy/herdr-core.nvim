@@ -81,7 +81,7 @@ function M.setup(config)
         if not row then return end
         if action == "activate" then
             if row.kind ~= "terminal" then
-                if row.id then dispatch({ type = "heading_toggled", id = row.id }) end
+                if row.kind == "machine" and row.id then dispatch({ type = "machine_toggled", id = row.id }) end
                 return
             end
             local windows = {}

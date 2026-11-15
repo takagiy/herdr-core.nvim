@@ -15,3 +15,6 @@ Calls to the `hc` CLI, turned into core events.
 - [x] When `hc` is missing or the core cannot start, the hc adapter can report why.
 - [x] When hc reports the same folder with backslashes in one place and slashes in another, the hc adapter can report both as the same folder.
 - [x] When the event stream closes, the hc adapter can report that it closed.
+
+- [x] 終了済みターミナルを初期一覧と再同期の一覧から除外する。
+- [x] 終了済みターミナルのラベルが変わっても一覧に復活させない。

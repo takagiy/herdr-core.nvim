@@ -46,6 +46,7 @@ jobs:
       - name: Run E2E with the pinned hc and real notifications
         timeout-minutes: 20
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           HC_VERSION_OVERRIDE: ${{ inputs.hc_version }}
         run: bash scripts/e2e-linux.sh 2>&1 | tee "$HERDR_E2E_ARTIFACTS/runner.log"
 

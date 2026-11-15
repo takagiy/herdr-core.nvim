@@ -42,7 +42,7 @@ Neovim, the plugin, hc, the Node.js dummy agent, the shell and the notification 
   - [x] When Neovim restarts, the sidebar can show the names and pins stored in hc.
 
 - Fold the list and open it again.
-  - [x] When the user folds and unfolds a space heading with Enter or a click, the sidebar can hide and show its terminal rows while the terminals keep running.
+  - [x] space 見出しで Enter を押したりクリックしたりしても、所属するターミナルが表示されたまま操作できる。
   - [x] When the user clicks `«` and then `»`, the sidebar can collapse to a strip and expand again without changing the terminal windows.
 
 ## Spaces

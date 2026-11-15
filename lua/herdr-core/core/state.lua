@@ -25,8 +25,8 @@ local M = {}
 ---@field folded    table<string, true>
 ---@field sidebar?  HerdrCoreSidebarState
 
----@class HerdrCoreHeadingToggled
----@field type 'heading_toggled'
+---@class HerdrCoreMachineToggled
+---@field type 'machine_toggled'
 ---@field id   string
 
 ---@class HerdrCoreNewTerminalRequested
@@ -49,7 +49,7 @@ local M = {}
 ---@field terminal string
 ---@field windows  table<string, string>
 
----@alias HerdrCoreEvent HerdrCoreSidebarRequested | HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreHeadingToggled | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict
+---@alias HerdrCoreEvent HerdrCoreSidebarRequested | HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreMachineToggled | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict
 ---@alias HerdrCoreEffect HerdrCoreSidebarEffect | HerdrCoreSetLabel | HerdrCoreSpaceEffect | HerdrCoreLayoutEffect | HerdrCoreOpenEffect | HerdrCoreNotify | HerdrCoreRunShell
 
 ---@class HerdrCoreUnknownEvent
@@ -83,7 +83,7 @@ local function with(state, changes)
 end
 
 ---@param state HerdrCoreState
----@param event HerdrCoreSidebarRequested | HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreHeadingToggled | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict | HerdrCoreUnknownEvent
+---@param event HerdrCoreSidebarRequested | HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreMachineToggled | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict | HerdrCoreUnknownEvent
 ---@return HerdrCoreState, HerdrCoreEffect[]
 function M.update(state, event)
     if event.type == "sidebar_requested" then
@@ -102,7 +102,7 @@ function M.update(state, event)
         }
         return state, { open.new_terminal(context, event.placement, event.tab) }
     end
-    if event.type == "heading_toggled" then
+    if event.type == "machine_toggled" then
         local folded = vim.deepcopy(state.folded)
         folded[event.id] = not folded[event.id] or nil
         return with(state, { folded = folded }), {}

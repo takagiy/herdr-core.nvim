@@ -184,18 +184,6 @@ T["shows the waiting count on a space heading"] = function ()
     MiniTest.expect.equality(assert(rows[1]).waiting, 2)
 end
 
-T["folds project rows but keeps their waiting count"] = function ()
-    -- Given a project containing a blocked terminal
-    local sidebar = require("herdr-core.core.sidebar")
-    local items = { terminal("t1", "/app", { status = "blocked" }) }
-    local previous, initial = sidebar.update(nil, items)
-    -- When the project is folded
-    local _, rows = sidebar.update(previous, items, { folded = { [assert(assert(initial[1]).id)] = true } })
-    -- Then only its heading remains with the waiting count
-    MiniTest.expect.equality(#rows, 1)
-    MiniTest.expect.equality(assert(rows[1]).waiting, 1)
-end
-
 T["reduces a collapsed sidebar to the total waiting count"] = function ()
     -- Given two waiting terminals in different projects
     local sidebar = require("herdr-core.core.sidebar")
@@ -228,6 +216,20 @@ T["folds remote machines without losing the total waiting count"] = function ()
     -- Then only its machine heading remains and total attention is preserved
     MiniTest.expect.equality(#rows, 1)
     MiniTest.expect.equality(assert(summary[1]).waiting, 1)
+end
+
+T["shows executable basenames without Windows exe suffixes"] = function ()
+    -- Given executable paths from Windows and Unix foreground processes
+    local sidebar = require("herdr-core.core.sidebar")
+    local programs = { [[C:\Tools\nvim.exe]], "C:/Tools/claude.EXE", "/usr/bin/fish", "codex", "my.tool" }
+    local shown = {}
+    -- When each terminal is displayed
+    for _, program in ipairs(programs) do
+        local _, rows = sidebar.update(nil, { terminal("t1", "/app", { program = program }) })
+        shown[#shown + 1] = assert(rows[2]).lines[2]
+    end
+    -- Then only the executable name is shown and other extensions remain intact
+    MiniTest.expect.equality(shown, { "nvim", "claude", "fish", "codex", "my.tool" })
 end
 
 return T

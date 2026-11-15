@@ -99,7 +99,6 @@ function M.update(previous, terminals, options)
         if not machine_folded then
             table.insert(rows, {
                 kind = "space",
-                id = root,
                 root = group.root,
                 machine = group.machine,
                 lines = {},
@@ -110,7 +109,9 @@ function M.update(previous, terminals, options)
             terminal_index = terminal_index + 1
             state.terminals[terminal.address] = terminal_index
             state.locations[terminal.address] = root
-            if not machine_folded and (not options.folded or not options.folded[root]) then
+            if not machine_folded then
+                local program = (terminal.program or ""):match([=[[^/\]+$]=]) or ""
+                program = program:gsub("%.[eE][xX][eE]$", "")
                 table.insert(rows, {
                     kind = "terminal",
                     address = terminal.address,
@@ -119,7 +120,7 @@ function M.update(previous, terminals, options)
                         .status,
                     lines = {
                         terminal.labels["herdr-core-nvim.name"] or terminal.name or terminal.address,
-                        terminal.program or ""
+                        program
                     }
                 })
             end

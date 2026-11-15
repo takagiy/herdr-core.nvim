@@ -237,17 +237,17 @@ T["asks to focus a chosen terminal's window or to show it"] = function ()
     MiniTest.expect.equality(policy, { { type = "show_terminal", terminal = "t2", placement = "vertical" } })
 end
 
--- When the user activates a heading, `update` can fold or unfold it.
-T["folds a heading and unfolds it again"] = function ()
-    -- Given a space heading
+-- When the user activates a machine heading, `update` can fold or unfold it.
+T["folds a machine and unfolds it again"] = function ()
+    -- Given a machine heading
     local core = require("herdr-core.core.state")
     local state = core.new()
     -- When it is activated twice
-    local folded = core.update(state, { type = "heading_toggled", id = "/app" })
-    local unfolded = core.update(folded, { type = "heading_toggled", id = "/app" })
+    local folded = core.update(state, { type = "machine_toggled", id = "machine:vps" })
+    local unfolded = core.update(folded, { type = "machine_toggled", id = "machine:vps" })
     -- Then it is folded after the first and unfolded after the second
-    MiniTest.expect.equality(folded.folded["/app"], true)
-    MiniTest.expect.equality(unfolded.folded["/app"], nil)
+    MiniTest.expect.equality(folded.folded["machine:vps"], true)
+    MiniTest.expect.equality(unfolded.folded["machine:vps"], nil)
 end
 
 -- When the user asks for a new terminal, `update` can ask for a shell where the opening policy decides.
@@ -291,7 +291,7 @@ end
 
 -- When the state changes, `view` can return the sidebar rows and the number of terminals waiting, keeping their order.
 T["returns the sidebar rows and the waiting count in a stable order"] = function ()
-    -- Given a blocked terminal in /app and an older idle one in /docs, with /docs folded
+    -- Given a blocked terminal in /app and an older idle one in /docs
     local core = require("herdr-core.core.state")
     local state = core.new()
     state.terminals.t1 = terminal("t1", { status = "blocked", status_ms = 20, labels = { ["herdr.space"] = "/app" } })
@@ -303,12 +303,11 @@ T["returns the sidebar rows and the waiting count in a stable order"] = function
             ["herdr.space"] = "/docs"
         }
     })
-    state = core.update(state, { type = "heading_toggled", id = string.char(0) .. "/docs" })
     -- When the view is taken, and taken again after /docs becomes the newest
     local next_state, rows, waiting = core.view(state)
     next_state.terminals.t2 = vim.tbl_extend("force", next_state.terminals.t2, { status_ms = 30 })
     local _, again = core.view(next_state)
-    -- Then /app with its terminal comes first, /docs shows only its heading, one terminal waits, and the order holds
+    -- Then /app with its terminal comes first, /docs also shows its terminal, one terminal waits, and the order holds
     ---@param list HerdrCoreSidebarRow[]
     ---@return string[]
     local function describe(list)
@@ -318,7 +317,7 @@ T["returns the sidebar rows and the waiting count in a stable order"] = function
         end
         return described
     end
-    MiniTest.expect.equality(describe(rows), { "space:/app", "terminal:t1", "space:/docs" })
+    MiniTest.expect.equality(describe(rows), { "space:/app", "terminal:t1", "space:/docs", "terminal:t2" })
     MiniTest.expect.equality(waiting, 1)
     MiniTest.expect.equality(describe(again), describe(rows))
 end

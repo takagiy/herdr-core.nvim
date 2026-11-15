@@ -1,5 +1,32 @@
 local MiniTest = require("mini.test")
-local T = MiniTest.new_set()
+local on_key = vim.on_key
+---@type fun(key: string, typed: string)?
+local mouse_listener
+local T = MiniTest.new_set({
+    hooks = {
+        pre_case = function ()
+            mouse_listener = nil
+            ---@param fn?        fun(key: string, typed: string): string?
+            ---@param namespace? integer
+            ---@param options?   table
+            ---@return integer
+            vim.on_key = function (fn, namespace, options)
+                if fn then mouse_listener = fn end
+                return on_key(fn, namespace, options)
+            end
+        end,
+        post_case = function () vim.on_key = on_key end
+    }
+})
+
+---@param key? string
+local function press_mouse(key)
+    local raw = vim.api.nvim_replace_termcodes(key or "<LeftMouse>", true, false, true)
+    assert(mouse_listener)(raw, raw)
+    local done = false
+    vim.schedule(function () done = true end)
+    assert(vim.wait(1000, function () return done end))
+end
 
 -- When given rows, the sidebar can draw headings, two-line terminal rows and counts with `HerdrCore` highlights.
 T["draws headings counts and two-line terminals with highlights"] = function ()
@@ -21,10 +48,16 @@ T["draws headings counts and two-line terminals with highlights"] = function ()
     sidebar.close()
     -- Then the terminal name and program occupy separate lines
     MiniTest.expect.equality(
-        { lines[1], lines[2], lines[3], lines[4] }, { "Waiting: 2", "app  [2]  +", "  ◐ build", "    claude" }
+        { lines[1], lines[2], lines[3], lines[4] }, { "  HERDR", "  app  · 2  +", "  ◐ build", "    claude" }
     )
     MiniTest.expect.equality(#marks > 0, true)
-    MiniTest.expect.equality(lines[#lines], "« Collapse")
+    local badge
+    for _, mark in ipairs(marks) do
+        local details = assert(mark[4])
+        if details.virt_text_pos == "right_align" then badge = details.virt_text end
+    end
+    MiniTest.expect.equality(badge, { { "2 waiting  ", "HerdrCoreBlocked" } })
+    MiniTest.expect.equality(lines[#lines], string.rep(" ", 31) .. "«")
 end
 
 -- When the user switches tabpages, the sidebar can stay on the same side and width.
@@ -67,31 +100,37 @@ T["reports a terminal chosen with Enter or a mouse click"] = function ()
     vim.fn.maparg("<CR>", "n", false, true).callback()
     local getmousepos = vim.fn.getmousepos
     vim.fn.getmousepos = function () return { winid = window, line = 3, column = 5 } end
-    vim.fn.maparg("<LeftMouse>", "n", false, true).callback()
+    press_mouse()
     vim.fn.getmousepos = getmousepos
     sidebar.close()
     -- Then both gestures choose the same terminal
     MiniTest.expect.equality(chosen, { { "activate", "t1" }, { "activate", "t1" } })
 end
 
--- When the user presses Enter or clicks on a heading, the sidebar can report the heading as folded or unfolded.
-T["reports heading activation so the app can toggle its fold"] = function ()
-    -- Given a space heading with its stable id
+T["ignores Enter and clicks on space headings"] = function ()
+    -- Given a space heading above a terminal
     local chosen = {}
-    local row = { kind = "space", id = "space1", root = "/app", lines = {} }
-    local sidebar = require("herdr-core.ui.sidebar").create(function (action, selected)
-        chosen[#chosen + 1] = { action, selected and selected.id }
+    local sidebar = require("herdr-core.ui.sidebar").create(function (action)
+        chosen[#chosen + 1] = action
     end)
     local window = sidebar.show()
-    sidebar.render({ row }, 0)
+    sidebar.render({
+        { kind = "space", root = "/app", lines = {} },
+        { kind = "terminal", address = "t1", lines = { "review", "claude" } }
+    }, 0)
     vim.api.nvim_set_current_win(window)
     vim.api.nvim_win_set_cursor(window, { 2, 0 })
-    -- When the heading is activated twice
-    vim.fn.maparg("<CR>", "n", false, true).callback()
-    vim.fn.maparg("<CR>", "n", false, true).callback()
+    -- When Enter is pressed and the heading is clicked
+    vim.cmd("normal " .. vim.api.nvim_replace_termcodes("<CR>", true, false, true))
+    local getmousepos = vim.fn.getmousepos
+    vim.fn.getmousepos = function () return { winid = window, line = 2, column = 1 } end
+    press_mouse()
+    vim.fn.getmousepos = getmousepos
+    local heading = vim.api.nvim_buf_get_lines(sidebar.buffer, 1, 2, false)[1]
     sidebar.close()
-    -- Then both gestures identify the same heading for folding or unfolding
-    MiniTest.expect.equality(chosen, { { "activate", "space1" }, { "activate", "space1" } })
+    -- Then no action is emitted and no fold arrow is shown
+    MiniTest.expect.equality(chosen, {})
+    MiniTest.expect.equality(heading, "  app  +")
 end
 
 -- When the user presses `n` on a row or clicks a heading's `+`, the sidebar can report a new terminal for that row's space.
@@ -109,8 +148,14 @@ T["reports new terminal requests from n and the heading plus button"] = function
     local keyboard = vim.fn.maparg("n", "n", false, true).callback
     if keyboard then keyboard() end
     local getmousepos = vim.fn.getmousepos
-    vim.fn.getmousepos = function () return { winid = window, line = 2, column = 11 } end
-    vim.fn.maparg("<LeftMouse>", "n", false, true).callback()
+    vim.fn.getmousepos = function ()
+        return {
+            winid = window,
+            line = 2,
+            column = #assert(vim.api.nvim_buf_get_lines(sidebar.buffer, 1, 2, false)[1])
+        }
+    end
+    press_mouse()
     vim.fn.getmousepos = getmousepos
     sidebar.close()
     -- Then both request a shell in the selected space
@@ -204,7 +249,7 @@ local function click(window, line)
     vim.api.nvim_set_current_win(window)
     local getmousepos = vim.fn.getmousepos
     vim.fn.getmousepos = function () return { winid = window, line = line, column = 1 } end
-    vim.fn.maparg("<LeftMouse>", "n", false, true).callback()
+    press_mouse()
     vim.fn.getmousepos = getmousepos
 end
 
@@ -215,7 +260,9 @@ T["collapses to a narrow strip when the bottom button is clicked"] = function ()
     local window = sidebar.show(30)
     sidebar.render({ { kind = "terminal", address = "t1", status = "blocked", lines = { "t1", "claude" } } }, 1)
     local bottom = vim.api.nvim_buf_line_count(sidebar.buffer)
-    MiniTest.expect.equality(vim.api.nvim_buf_get_lines(sidebar.buffer, bottom - 1, bottom, false)[1], "« Collapse")
+    MiniTest.expect.equality(
+        vim.api.nvim_buf_get_lines(sidebar.buffer, bottom - 1, bottom, false)[1], string.rep(" ", 29) .. "«"
+    )
     -- When the button on the bottom line is clicked
     click(window, bottom)
     local width = vim.api.nvim_win_get_width(window)
@@ -242,7 +289,7 @@ T["shows the waiting count at the top and the expand button at the bottom when c
     -- Then the count stays on the top line and the button on the window's bottom line
     MiniTest.expect.equality(shown[1], "2")
     MiniTest.expect.equality(#shown, height)
-    MiniTest.expect.equality(shown[#shown], "»")
+    MiniTest.expect.equality(shown[#shown], "  »")
 end
 
 -- When the user clicks `»`, the sidebar can expand again.
@@ -289,6 +336,31 @@ T["uses the keys the user sets in place of the defaults"] = function ()
     MiniTest.expect.equality(defaults, { false, false, false, false, false })
 end
 
+T["lets user action keys override item navigation"] = function ()
+    -- Given action keys that overlap with default navigation keys
+    local reported = {}
+    local sidebar = require("herdr-core.ui.sidebar").create(function (action, row)
+        reported[#reported + 1] = { action, row and row.address }
+    end, { activate = "j", new_terminal = "<Down>", pin = "k", unread = "<Up>" })
+    local window = sidebar.show()
+    sidebar.render({ { kind = "terminal", address = "t1", lines = { "review", "claude" } } }, 0)
+    vim.api.nvim_set_current_win(window)
+    vim.api.nvim_win_set_cursor(window, { 2, 0 })
+    -- When the configured keys are pressed through their actual mappings
+    vim.cmd("normal j")
+    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Down>k<Up>", true, false, true), "xt", false)
+    local line = vim.api.nvim_win_get_cursor(window)[1]
+    sidebar.close()
+    -- Then each key performs its configured action without moving the cursor
+    MiniTest.expect.equality(reported, {
+        { "activate", "t1" },
+        { "new_terminal", "t1" },
+        { "pin", "t1" },
+        { "unread", "t1" }
+    })
+    MiniTest.expect.equality(line, 2)
+end
+
 -- When a new tabpage is opened from the sidebar window, the sidebar can appear in it beside the new window.
 T["appears in a tab opened from the sidebar window"] = function ()
     -- Given the cursor in a shown sidebar
@@ -312,24 +384,161 @@ end
 
 -- When the user clicks the same place again quickly, the sidebar can treat the second click like the first.
 T["treats a quick second click like the first"] = function ()
-    -- Given a heading that the user has just clicked
+    -- Given a terminal that the user has just clicked
     local reported = {}
     local sidebar = require("herdr-core.ui.sidebar").create(function (action, row)
-        reported[#reported + 1] = { action, row and row.id }
+        reported[#reported + 1] = { action, row and row.address }
     end)
     local window = sidebar.show()
-    sidebar.render({ { kind = "space", id = "/app", root = "/app", lines = {} } }, 0)
+    sidebar.render({ { kind = "terminal", address = "t1", lines = { "review", "claude" } } }, 0)
     vim.api.nvim_set_current_win(window)
     local getmousepos = vim.fn.getmousepos
     vim.fn.getmousepos = function () return { winid = window, line = 2, column = 1 } end
-    vim.fn.maparg("<LeftMouse>", "n", false, true).callback()
+    press_mouse()
     -- When the second click arrives as a double click
-    local double = vim.fn.maparg("<2-LeftMouse>", "n", false, true).callback
-    if double then double() end
+    press_mouse("<2-LeftMouse>")
     vim.fn.getmousepos = getmousepos
     sidebar.close()
-    -- Then both clicks fold or unfold the heading
-    MiniTest.expect.equality(reported, { { "activate", "/app" }, { "activate", "/app" } })
+    -- Then both clicks activate the terminal
+    MiniTest.expect.equality(reported, { { "activate", "t1" }, { "activate", "t1" } })
+end
+
+T["moves between sidebar items instead of display lines"] = function ()
+    -- Given two-line terminals under project headings
+    local sidebar = require("herdr-core.ui.sidebar").create()
+    local window = sidebar.show()
+    sidebar.render({
+        { kind = "space", root = "/app", lines = {} },
+        { kind = "terminal", address = "t1", lines = { "first", "claude" } },
+        { kind = "terminal", address = "t2", lines = { "second", "codex" } },
+        { kind = "space", root = "/other", lines = {} }
+    }, 0)
+    vim.api.nvim_set_current_win(window)
+    vim.api.nvim_win_set_cursor(window, { 2, 0 })
+    local positions = {}
+    -- When moving down and up with Vim keys and arrow keys
+    for _, key in ipairs({ "j", "<Down>", "<Up>", "k" }) do
+        local mapping = vim.fn.maparg(key, "n", false, true)
+        if mapping.callback then
+            mapping.callback()
+        else
+            vim.cmd("normal! " .. (key == "<Down>" and "j" or key == "<Up>" and "k" or key))
+        end
+        positions[#positions + 1] = vim.api.nvim_win_get_cursor(window)[1]
+    end
+    vim.cmd("normal 2j")
+    local counted = vim.api.nvim_win_get_cursor(window)[1]
+    vim.api.nvim_win_set_cursor(window, { 4, 0 })
+    vim.fn.maparg("k", "n", false, true).callback()
+    local from_program = vim.api.nvim_win_get_cursor(window)[1]
+    vim.cmd("normal 99j")
+    local bottom = vim.api.nvim_win_get_cursor(window)[1]
+    local footer = vim.api.nvim_buf_line_count(sidebar.buffer)
+    vim.cmd("normal 99k")
+    local top = vim.api.nvim_win_get_cursor(window)[1]
+    sidebar.close()
+    -- Then each key moves to the next or previous item name, counts clamp at the ends
+    MiniTest.expect.equality(positions, { 3, 5, 3, 2 })
+    MiniTest.expect.equality({ counted, from_program, bottom, top }, { 5, 2, footer, 2 })
+end
+
+T["dims the program but keeps the terminal name in normal text"] = function ()
+    -- Given an idle terminal with a name and program
+    require("herdr-core.ui.highlights").setup()
+    local sidebar = require("herdr-core.ui.sidebar").create()
+    sidebar.render({ { kind = "terminal", address = "t1", status = "idle", lines = { "review", "claude" } } }, 0)
+    -- When its highlight ranges are inspected
+    local marks = vim.api.nvim_buf_get_extmarks(sidebar.buffer, -1, 0, -1, { details = true })
+    local status_end, program
+    for _, mark in ipairs(marks) do
+        local details = assert(mark[4])
+        if details.hl_group == "HerdrCoreIdle" then
+            status_end = { details.end_row, details.end_col }
+        end
+        if details.hl_group == "HerdrCoreProgram" then program = mark[2] end
+    end
+    sidebar.close()
+    -- Then status color stops before the name and the program uses Comment
+    MiniTest.expect.equality(status_end, { 1, #("  ○ ") })
+    MiniTest.expect.equality(program, 2)
+    MiniTest.expect.equality(vim.api.nvim_get_hl(0, { name = "HerdrCoreProgram", link = true }).link, "Comment")
+end
+
+T["highlights both lines of the active terminal and keeps it while using the sidebar"] = function ()
+    -- Given two terminal buffers and a sidebar
+    local original = vim.api.nvim_get_current_buf()
+    local first, second = vim.api.nvim_create_buf(false, true), vim.api.nvim_create_buf(false, true)
+    vim.b[first].herdr_core_address, vim.b[second].herdr_core_address = "t1", "t2"
+    local sidebar = require("herdr-core.ui.sidebar").create()
+    local window = sidebar.show()
+    sidebar.render({
+        { kind = "terminal", address = "t1", lines = { "review", "claude" } },
+        { kind = "terminal", address = "t2", lines = { "build", "codex" } }
+    }, 0)
+    local function active()
+        local found = {}
+        for _, mark in ipairs(vim.api.nvim_buf_get_extmarks(sidebar.buffer, -1, 0, -1, { details = true })) do
+            local details = assert(mark[4])
+            if details.hl_group == "HerdrCoreActive" then
+                found[#found + 1] = { mark[2], details.end_row, details.hl_eol }
+            end
+        end
+        return found
+    end
+    -- When switching terminals, entering the sidebar, and returning to a file
+    vim.api.nvim_set_current_buf(first)
+    vim.wait(20, function () return false end)
+    local one = active()
+    vim.api.nvim_set_current_buf(second)
+    vim.wait(20, function () return false end)
+    local two = active()
+    local terminal_window = vim.api.nvim_get_current_win()
+    vim.api.nvim_set_current_win(window)
+    vim.wait(20, function () return false end)
+    local kept = active()
+    vim.api.nvim_set_current_win(terminal_window)
+    vim.api.nvim_set_current_buf(original)
+    vim.wait(20, function () return false end)
+    local cleared = active()
+    sidebar.close()
+    vim.api.nvim_buf_delete(first, { force = true })
+    vim.api.nvim_buf_delete(second, { force = true })
+    -- Then just the active terminal has a full-width two-line background
+    MiniTest.expect.equality(one, { { 1, 3, true } })
+    MiniTest.expect.equality(two, { { 3, 5, true } })
+    MiniTest.expect.equality(kept, two)
+    MiniTest.expect.equality(cleared, {})
+end
+
+T["emphasizes labels and the space owning the selected terminal"] = function ()
+    -- Given two spaces and a selected terminal in the second space
+    local original = vim.api.nvim_get_current_buf()
+    local terminal = vim.api.nvim_create_buf(false, true)
+    vim.b[terminal].herdr_core_address = "t2"
+    vim.api.nvim_set_current_buf(terminal)
+    local sidebar = require("herdr-core.ui.sidebar").create()
+    -- When both spaces are rendered
+    sidebar.render({
+        { kind = "space", root = "/one", lines = {} },
+        { kind = "terminal", address = "t1", lines = { "first", "claude" } },
+        { kind = "space", root = "/two", lines = {} },
+        { kind = "terminal", address = "t2", lines = { "second", "codex" } }
+    }, 0)
+    local spaces, labels = {}, {}
+    for _, mark in ipairs(vim.api.nvim_buf_get_extmarks(sidebar.buffer, -1, 0, -1, { details = true })) do
+        local details = assert(mark[4])
+        if details.hl_group == "HerdrCoreSpace" or details.hl_group == "HerdrCoreSpaceActive" then
+            spaces[#spaces + 1] = { mark[2], details.hl_group, details.hl_eol }
+        elseif details.hl_group == "HerdrCoreLabel" then
+            labels[#labels + 1] = { mark[2], mark[3] }
+        end
+    end
+    sidebar.close()
+    vim.api.nvim_set_current_buf(original)
+    vim.api.nvim_buf_delete(terminal, { force = true })
+    -- Then only the owning heading is selected, and both labels have their own style
+    MiniTest.expect.equality(spaces, { { 1, "HerdrCoreSpace", true }, { 5, "HerdrCoreSpaceActive", true } })
+    MiniTest.expect.equality(labels, { { 2, #("    ") }, { 6, #("    ") } })
 end
 
 return T
