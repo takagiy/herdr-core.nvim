@@ -81,19 +81,17 @@ Neovim, the plugin, hc, the Node.js dummy agent, the shell and the notification 
 
 These items check the CI workflow and its runs rather than Lua behavior.
 
-- Run E2E daily on Linux with the latest hc.
+- Run E2E on Linux with the pinned hc, daily and on pull requests.
   - [x] When the E2E workflow is read, it can be scheduled daily around 6:00 in Japan (21:00 UTC) and started by hand.
-  - [x] When CI runs on Linux, it can verify the latest hc release's SHA-256, run every case with that version and record the version.
+  - [x] When CI runs on Linux, it can verify the SHA-256 of the hc version in `mise.toml`, run every case with that version and record the version.
+  - [ ] When Renovate proposes a newer hc version, CI can run the E2E on that pull request with the new version.
+  - [x] When the workflow is started by hand with an hc version, CI can run the E2E with that version instead.
   - [x] When a downloaded release does not match its checksum, the installer can fail without running the extracted hc.
   - [x] When a case fails or times out in CI, the run can keep the case name, screen, messages and hc state and logs as an artifact and still clean up.
 
 ## Optional
 
 Decided after the main paths are done, by value and complexity.
-
-- Compare with an hc version that worked.
-  - [ ] When every E2E case passes on the latest hc, CI can record that version, and keep the previous record when a case fails.
-  - [ ] When a comparison run is started, CI can run the same plugin commit against the recorded hc version and show both results and versions.
 
 - Keep a trace of operations and screens.
   - [ ] When a traced case fails, CI can provide the operations, times and screens in order.

@@ -17,7 +17,8 @@ export HERDR_E2E_ARTIFACTS="${HERDR_E2E_ARTIFACTS:-$PWD/artifacts/e2e}"
 export HERDR_E2E_DUNST_LOG="$HERDR_E2E_ARTIFACTS/dunst.log"
 mkdir -p "$HERDR_E2E_ARTIFACTS"
 hc_dir="$(mktemp -d)/hc"
-node scripts/install-hc.mjs "$hc_dir" "${HC_VERSION:-}" | tee "$HERDR_E2E_ARTIFACTS/installer.log"
+# HC_VERSION comes from mise.toml; HC_VERSION_OVERRIDE runs another version, such as one that passed before.
+node scripts/install-hc.mjs "$hc_dir" "${HC_VERSION_OVERRIDE:-$HC_VERSION}" | tee "$HERDR_E2E_ARTIFACTS/installer.log"
 export PATH="$hc_dir/bin:$PATH"
 hc --version | tee "$HERDR_E2E_ARTIFACTS/hc-version.txt"
 dbus-run-session -- xvfb-run -a bash -euo pipefail -c '
