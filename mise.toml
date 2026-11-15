@@ -1,0 +1,33 @@
+[tools]
+neovim = "0.11.7"
+
+# EmmyLua's tools are not in mise's registry; one release holds both.
+[tools."http:emmylua_check"]
+version = "0.25.1"
+[tools."http:emmylua_check".platforms]
+windows-x64 = { url = "https://github.com/EmmyLuaLs/emmylua-analyzer-rust/releases/download/{{ version }}/emmylua_check-win32-x64.zip" }
+linux-x64 = { url = "https://github.com/EmmyLuaLs/emmylua-analyzer-rust/releases/download/{{ version }}/emmylua_check-linux-x64.tar.gz" }
+macos-arm64 = { url = "https://github.com/EmmyLuaLs/emmylua-analyzer-rust/releases/download/{{ version }}/emmylua_check-darwin-arm64.tar.gz" }
+macos-x64 = { url = "https://github.com/EmmyLuaLs/emmylua-analyzer-rust/releases/download/{{ version }}/emmylua_check-darwin-x64.tar.gz" }
+
+[tools."http:luafmt"]
+version = "0.25.1"
+[tools."http:luafmt".platforms]
+windows-x64 = { url = "https://github.com/EmmyLuaLs/emmylua-analyzer-rust/releases/download/{{ version }}/luafmt-win32-x64.zip" }
+linux-x64 = { url = "https://github.com/EmmyLuaLs/emmylua-analyzer-rust/releases/download/{{ version }}/luafmt-linux-x64.tar.gz" }
+macos-arm64 = { url = "https://github.com/EmmyLuaLs/emmylua-analyzer-rust/releases/download/{{ version }}/luafmt-darwin-arm64.tar.gz" }
+macos-x64 = { url = "https://github.com/EmmyLuaLs/emmylua-analyzer-rust/releases/download/{{ version }}/luafmt-darwin-x64.tar.gz" }
+
+[tasks.check]
+description = "Type-check with emmylua_check"
+# emmylua_check reads Neovim's API types from $VIMRUNTIME; take it from this project's Neovim.
+env = { VIMRUNTIME = "{{ exec(command='nvim --clean --headless --cmd \"lua io.write(vim.env.VIMRUNTIME)\" +q') }}" }
+run = "emmylua_check --warnings-as-errors ."
+
+[tasks.fmt]
+description = "Format with luafmt"
+run = "luafmt . --write"
+
+[tasks.fmt-check]
+description = "Check formatting with luafmt"
+run = "luafmt . --check"

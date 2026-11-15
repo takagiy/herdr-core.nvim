@@ -1,0 +1,33 @@
+{
+  "$schema": "https://raw.githubusercontent.com/EmmyLuaLs/emmylua-analyzer-rust/main/crates/emmylua_code_analysis/resources/schema.json",
+  "runtime": {
+    "version": "LuaJIT"
+  },
+  "workspace": {
+    "library": [
+      "{env:VIMRUNTIME}/lua"
+    ]
+  },
+  "diagnostics": {
+    "enables": [
+      "incomplete-signature-doc",
+      "missing-global-doc",
+      "unknown-doc-tag"
+    ],
+    "severity": {
+      "incomplete-signature-doc": "error",
+      "missing-global-doc": "error",
+      "unused": "error",
+      "unreachable-code": "error",
+      "deprecated": "error",
+      "redefined-local": "error",
+      "duplicate-require": "error"
+    }
+  },
+  "strict": {
+    "requirePath": true,
+    "typeCall": true,
+    "arrayIndex": true,
+    "docBaseConstMatchBaseType": false
+  }
+}
