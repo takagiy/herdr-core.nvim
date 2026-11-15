@@ -36,9 +36,12 @@ T["keeps a sidebar on the left with the same width across tabs"] = function ()
     -- When a new tab is entered
     vim.cmd.tabnew()
     local second
-    for _, window in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-        if vim.api.nvim_win_get_buf(window) == sidebar.buffer then second = window end
-    end
+    vim.wait(1000, function ()
+        for _, window in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+            if vim.api.nvim_win_get_buf(window) == sidebar.buffer then second = window end
+        end
+        return second ~= nil
+    end)
     local first_width = vim.api.nvim_win_get_width(first)
     local second_width = second and vim.api.nvim_win_get_width(second)
     sidebar.close()
@@ -284,6 +287,49 @@ T["uses the keys the user sets in place of the defaults"] = function ()
         reported, { { "activate", "t1" }, { "new_terminal", "t1" }, { "pin", "t1" }, { "unread", "t1" } }
     )
     MiniTest.expect.equality(defaults, { false, false, false, false, false })
+end
+
+-- When a new tabpage is opened from the sidebar window, the sidebar can appear in it beside the new window.
+T["appears in a tab opened from the sidebar window"] = function ()
+    -- Given the cursor in a shown sidebar
+    local sidebar = require("herdr-core.ui.sidebar").create()
+    local original = vim.api.nvim_get_current_tabpage()
+    vim.api.nvim_set_current_win(sidebar.show(24))
+    -- When a new tab is opened from there
+    vim.cmd.tabnew()
+    vim.wait(100)
+    local shown = 0
+    for _, window in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+        if vim.api.nvim_win_get_buf(window) == sidebar.buffer then shown = shown + 1 end
+    end
+    local windows = #vim.api.nvim_tabpage_list_wins(0)
+    sidebar.close()
+    vim.cmd.tabclose()
+    vim.api.nvim_set_current_tabpage(original)
+    -- Then the new tab has the sidebar next to its own window
+    MiniTest.expect.equality({ shown, windows }, { 1, 2 })
+end
+
+-- When the user clicks the same place again quickly, the sidebar can treat the second click like the first.
+T["treats a quick second click like the first"] = function ()
+    -- Given a heading that the user has just clicked
+    local reported = {}
+    local sidebar = require("herdr-core.ui.sidebar").create(function (action, row)
+        reported[#reported + 1] = { action, row and row.id }
+    end)
+    local window = sidebar.show()
+    sidebar.render({ { kind = "space", id = "/app", root = "/app", lines = {} } }, 0)
+    vim.api.nvim_set_current_win(window)
+    local getmousepos = vim.fn.getmousepos
+    vim.fn.getmousepos = function () return { winid = window, line = 2, column = 1 } end
+    vim.fn.maparg("<LeftMouse>", "n", false, true).callback()
+    -- When the second click arrives as a double click
+    local double = vim.fn.maparg("<2-LeftMouse>", "n", false, true).callback
+    if double then double() end
+    vim.fn.getmousepos = getmousepos
+    sidebar.close()
+    -- Then both clicks fold or unfold the heading
+    MiniTest.expect.equality(reported, { { "activate", "/app" }, { "activate", "/app" } })
 end
 
 return T

@@ -60,14 +60,17 @@ function M.create(on_action, keys)
     vim.keymap.set(
         "n", bound.activate, function () activate(assert(vim.api.nvim_win_get_cursor(0)[1])) end, { buffer = buffer }
     )
-    vim.keymap.set("n", "<LeftMouse>", function ()
+    local function click()
         local mouse = vim.fn.getmousepos()
         if mouse.winid == 0 or vim.api.nvim_win_get_buf(mouse.winid) ~= buffer then return end
         vim.api.nvim_set_current_win(mouse.winid)
         vim.api.nvim_win_set_cursor(mouse.winid, { mouse.line, 0 })
         activate(mouse.line, mouse.column)
-    end, { buffer = buffer }
-    )
+    end
+    -- Quick repeated clicks arrive as multi-clicks; each one still acts like a click.
+    for _, key in ipairs({ "<LeftMouse>", "<2-LeftMouse>", "<3-LeftMouse>", "<4-LeftMouse>" }) do
+        vim.keymap.set("n", key, click, { buffer = buffer })
+    end
     vim.keymap.set("n", bound.new_terminal, function ()
         if on_action then on_action("new_terminal", by_line[assert(vim.api.nvim_win_get_cursor(0)[1])]) end
     end, { buffer = buffer }
@@ -104,7 +107,11 @@ function M.create(on_action, keys)
         return window
     end
     local group = vim.api.nvim_create_augroup("HerdrCoreSidebar" .. buffer, { clear = true })
-    vim.api.nvim_create_autocmd("TabEnter", { group = group, callback = function () if shown then show() end end })
+    -- Wait until :tabnew has put its own buffer in the new window, which at TabEnter still shows the current buffer.
+    vim.api.nvim_create_autocmd("TabEnter", {
+        group = group,
+        callback = function () vim.schedule(function () if shown then show() end end) end
+    })
     -- Redraw so the toggle stays on the bottom line when the window height changes.
     vim.api.nvim_create_autocmd({ "VimResized", "WinResized" }, {
         group = group,

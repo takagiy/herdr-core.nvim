@@ -1,0 +1,54 @@
+name: Linux E2E
+
+on:
+  schedule:
+    - cron: '0 21 * * *'
+  workflow_dispatch:
+    inputs:
+      hc_version:
+        description: 'Known hc version to compare (blank uses latest)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        timeout-minutes: 2
+        with:
+          persist-credentials: false
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p "$RUNNER_TEMP/herdr-e2e-artifacts"
+          echo "HERDR_E2E_ARTIFACTS=$RUNNER_TEMP/herdr-e2e-artifacts" >> "$GITHUB_ENV"
+
+      - name: Test hc acquisition
+        timeout-minutes: 2
+        run: node --test tests/install-hc.test.mjs 2>&1 | tee "$HERDR_E2E_ARTIFACTS/installer-tests.log"
+
+      - name: Run E2E with the latest hc and real notifications
+        timeout-minutes: 20
+        env:
+          HC_VERSION: ${{ inputs.hc_version }}
+        run: bash scripts/e2e-linux.sh 2>&1 | tee "$HERDR_E2E_ARTIFACTS/runner.log"
+
+      - name: Upload E2E evidence
+        if: ${{ always() }}
+        timeout-minutes: 3
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.HERDR_E2E_ARTIFACTS }}
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 14

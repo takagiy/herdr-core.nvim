@@ -1,5 +1,6 @@
 [tools]
 neovim = "0.11.7"
+node = "24.14.0"
 
 # EmmyLua's tools are not in mise's registry; one release holds both.
 [tools."http:emmylua_check"]
@@ -35,3 +36,12 @@ run = "luafmt . --check"
 [tasks.test]
 description = "Run the tests with mini.test"
 run = "nvim --headless --noplugin -u NONE -c \"lua dofile('scripts/test.lua')\""
+
+[tasks.test-e2e]
+description = "Run E2E with real hc and terminal processes"
+env = { HERDR_TEST_GROUP = "e2e" }
+run = "nvim --headless --noplugin -u NONE -c \"lua dofile('scripts/test.lua')\""
+
+[tasks.test-e2e-linux]
+description = "Run E2E on Linux in Docker"
+run = 'docker run --rm -v "{{config_root}}:/workspace" -w /workspace ubuntu:24.04 bash scripts/e2e-linux.sh'

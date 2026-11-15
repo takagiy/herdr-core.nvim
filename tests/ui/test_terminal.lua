@@ -114,22 +114,6 @@ T["does not leave a buffer behind when attach cannot start"] = function ()
     MiniTest.expect.equality(vim.api.nvim_list_bufs(), before)
 end
 
--- When the buffer of a terminal window is wiped, the terminal's program can keep running in the core.
-T["keeps the program running in the core when its buffer is wiped"] = function ()
-    local hc = vim.fn.exepath("hc")
-    if hc == "" or not pcall(vim.system, { hc, "--version" }) then MiniTest.skip("hc is not installed") end
-    -- Given a program running in the core and a terminal buffer attached to it
-    local name = "herdr-core-nvim-test-" .. vim.fn.getpid()
-    vim.system({ hc, "run", "--bg", "--name", name, "--", vim.v.progpath, "--headless", "--clean" }):wait()
-    local buffer = require("herdr-core.ui.terminal").buffer({ address = name }, { hc, "attach", name })
-    -- When the buffer is wiped
-    vim.api.nvim_buf_delete(buffer, { force = true })
-    local record = vim.json.decode(assert(vim.system({ hc, "get", name, "--json" }):wait().stdout))
-    vim.system({ hc, "kill", name }):wait()
-    -- Then the program is still live in the core
-    MiniTest.expect.equality(record.state, "live")
-end
-
 T["attaches inside the existing URI read buffer"] = function ()
     -- Given the named buffer Neovim created before BufReadCmd
     local existing = vim.api.nvim_create_buf(true, false)

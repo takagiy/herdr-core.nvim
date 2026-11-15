@@ -1,147 +1,103 @@
-# 実際の hc を通す E2E
+# E2E through the real hc
 
-[対象と実行方針](../adr/e2e-with-real-hc.md)・[技術選定](../adr/e2e-toolchain.md)に従う。本文の子項目を1つずつ実テストにし、Given/When/Then をテストにも残す。実テスト名は子項目の文と対応させ、Red → Green を確認した項目だけ `[x]` にする。異なる入力方法で同じ振る舞いを確認する項目は、パラメーターごとに実行する。
+Follows the [scope and policy](../adr/e2e-with-real-hc.md) and the [toolchain](../adr/e2e-toolchain.md). Each nested item becomes one real test whose name matches it and whose comments carry Given/When/Then. An item gets `[x]` only after its test was seen failing and then passing. Items checked with several input methods run once per method.
 
-Neovim、プラグイン、hc、Node.js の dummy agent、シェル、通知機構は実物を使う。主要操作はキー入力・マウス入力を通し、内部関数の直接呼び出しや通信の差し替えで代用しない。入力した文字の端末エコーだけでは入出力成功とせず、プログラムが生成した応答を確認する。
+Neovim, the plugin, hc, the Node.js dummy agent, the shell and the notification service are all real. Main operations go through keys and mouse input, not direct calls to internal functions or replaced communication. An echo of typed text does not count as input and output working; the test checks a reply that the program produced.
 
-## 実行基盤
+## Test runs
 
-- 通常テストと E2E を分けて実行する。
-  - [ ] `mise run test` は hc がなくても通常テストだけを実行する。
-    Given: hc を含めない PATH。When: 通常テストを実行する。Then: E2E と hc プロセスを起動せず、通常テストが成功する。
-  - [ ] `mise run test-e2e` は通常テストを含めず E2E だけを実行する。
-    Given: 必要な実行環境。When: E2E を実行する。Then: E2E のケースだけが結果に載り、対象が0件なら失敗する。
-  - [ ] E2E は必要な実行ファイルがないとスキップせず失敗する。
-    Given: Neovim・hc・Node.js・シェルのいずれかがない環境。When: E2E を開始する。Then: 不足した実行ファイルを示し、終了コードが非0になる。
+- Ordinary tests and E2E run separately.
+  - [x] When hc is not on the PATH, `mise run test` can run only the ordinary tests.
+  - [ ] When `mise run test-e2e` runs, it can run only the E2E cases and fail when none are collected.
+  - [x] When Neovim, hc or Node.js is missing, E2E can fail with the missing executable instead of skipping.
 
-- 専用環境を作り、成功・失敗のどちらでも片づける。
-  - [ ] E2E は別の hc セッションのターミナル・設定・保存済み配置を変更しない。
-    Given: 比較用の専用 hc 環境と、継承された hc 接続先・所属の環境変数。When: 別の専用環境で E2E を実行する。Then: 操作は E2E の環境だけに届き、比較用環境の値とプログラムは変わらない。
-  - [ ] E2E は終了時に自分が作ったプロセスだけを終了する。
-    Given: E2E 用と比較用のプロセス。When: E2E が成功・失敗・待機のタイムアウトで終了する。Then: E2E 用の Neovim・hc・子プログラムが残らず、比較用のプロセスは動き続ける。
+- E2E runs in its own environment and cleans up after success and failure.
+  - [x] When E2E runs next to another hc session, it can leave that session's terminals, settings and saved layout unchanged.
+  - [x] When E2E ends by success, failure or timeout, it can stop only the processes it started.
 
-## ターミナルの起動と再接続
+## Starting and reattaching terminals
 
-- dummy agent に接続し、window を閉じても続きを操作する。
-  - [ ] 実際の attach から dummy agent へ送った入力への応答が Neovim に表示される。
-    Given: hc 上で動く共通の Node.js dummy agent。When: サイドバーから開き、一意な文字列をキー入力する。Then: dummy agent が生成した、その入力に対応する応答が terminal buffer に表示される。
-  - [ ] terminal buffer を破棄しても同じ dummy agent に再接続できる。
-    Given: 入出力済みの dummy agent。When: 表示 window を閉じて buffer を破棄し、サイドバーから再び開く。Then: 同じアドレス・プロセスの出力が残り、追加の入力にも応答する。
-  - [ ] Neovim を終了しても同じ dummy agent に再接続できる。
-    Given: 入出力済みの dummy agent を表示している Neovim。When: Neovim を終了し、新しい Neovim でプラグインを起動する。Then: 同じアドレス・プロセスのターミナルが復元され、追加の入力にも応答する。
-  - [ ] プログラムを終了すると表示していたターミナルの window が閉じる。
-    Given: dummy agent の window と別の window。When: attach を通した入力で dummy agent を正常終了する。Then: hc の終了がプラグインへ反映され、対象 window だけが閉じる。
+- Talk to the dummy agent and keep using it after its window closes.
+  - [x] When the user types into a dummy agent opened from the sidebar, Neovim can show the agent's reply through a real attach.
+  - [ ] When the terminal buffer is wiped and the agent is opened again from the sidebar, the plugin can reattach to the same agent.
+  - [ ] When Neovim exits and a new Neovim starts the plugin, the plugin can reattach to the same agent.
+  - [ ] When the dummy agent exits, the plugin can close only the windows that showed it.
 
-- プラグインの操作から実際のシェルを起動する。
-  - [ ] 新規起動アクションは指定した tab・縦分割・横分割に操作可能なシェルを開く。
-    Given: アクションを割り当てたキーと表示中のターミナル。When: 各配置のキーを入力する。Then: hc に新しいシェルが1つ生まれ、指定した配置で入力への応答を表示する。
-  - [ ] ターミナルから新規起動したシェルは、そのターミナルの現在のディレクトリを使う。
-    Given: 空白や日本語を含むディレクトリへ移動済みのターミナル。When: 新しいシェルを開く。Then: 新しいシェルの cwd がそのディレクトリと一致する。
-  - [ ] ファイルの window から新規起動したシェルは Neovim の cwd を使う。
-    Given: cwd を設定した Neovim のファイル window。When: 新しいシェルを開く。Then: シェルの cwd が Neovim の cwd と一致する。
-  - [ ] サイドバーから新規起動したシェルは選択したスペースのディレクトリを使う。
-    Given: 複数スペースのサイドバー。When: 見出し上の `n` または `+` のクリックでシェルを開く。Then: 対象スペースのディレクトリで実際のシェルが起動する。
+- Start real shells from the plugin.
+  - [ ] When the user presses the keys for a new terminal in a tab, a vertical split and a horizontal split, the plugin can open a working shell in each place.
+  - [ ] When a new shell is opened from a terminal window, it can start in that terminal's current folder, including folders with spaces and Japanese names.
+  - [ ] When a new shell is opened from a file window, it can start in Neovim's current folder.
+  - [ ] When a new shell is opened from a space heading with `n` or a click on `+`, it can start in that space's folder.
 
-## サイドバーからの操作
+## Sidebar
 
-- 一覧から目的のターミナルを開く。
-  - [ ] 表示中のターミナルを選ぶと既存 window に移動する。
-    Given: 別の tab に表示中のターミナル。When: 一覧の行を Enter またはクリックで選ぶ。Then: 既存 window に移り、window や attach を重複して作らない。
-  - [ ] 未表示のターミナルを選ぶと新しい tab に開く。
-    Given: hc に存在するが window に表示していないターミナル。When: 一覧の行を Enter またはクリックで選ぶ。Then: 新しい tab の terminal buffer から、そのプログラムへ入力できる。
-  - [ ] `herdr://` を直接開いても対象のターミナルを操作できる。
-    Given: hc に存在するターミナル。When: Neovim で対応する `herdr://` を開く。Then: URI の buffer に接続し、重複した buffer 名のエラーなしに応答を表示する。
+- Open a terminal from the list.
+  - [x] When the user chooses a terminal already shown in another tab, the plugin can move to its window without opening another.
+  - [x] When the user chooses a terminal that no window shows, the plugin can open it in a new tab where the user can type into it.
+  - [x] When the user opens a `herdr://` URI directly, the plugin can attach that buffer to the terminal without a duplicate buffer name error.
 
-- 名前とピンを変更して、開き直す。
-  - [ ] 名前変更は hc の label とサイドバー・buffer 名へ反映される。
-    Given: 一覧と window に表示中のターミナル。When: `r` から新しい名前を入力する。Then: `herdr-core-nvim.name` とサイドバー・`herdr://` の名前が新しい値になる。
-  - [ ] ピンの切り替えは hc の label とサイドバーへ反映される。
-    Given: ピンのないターミナル。When: `p` でピンを付け、再び `p` で外す。Then: 各操作が `herdr.pinned` とサイドバーへ反映される。
-  - [ ] 名前とピンは Neovim を再起動しても残る。
-    Given: 名前を変更し、ピン留めしたターミナル。When: Neovim を終了して起動し直す。Then: hc に保存された名前とピンが一覧に表示される。
+- Name and pin a terminal, then open Neovim again.
+  - [x] When the user names a terminal with `r`, the plugin can write the `herdr-core-nvim.name` label and show the name in the sidebar while the `herdr://` buffer name stays the same.
+  - [x] When the user presses `p` twice on a terminal, the plugin can pin it and unpin it in the `herdr.pinned` label and the sidebar.
+  - [x] When Neovim restarts, the sidebar can show the names and pins stored in hc.
 
-- 一覧を折りたたみ、再び開く。
-  - [ ] 見出しの折りたたみと展開で配下のターミナル行の表示が切り替わる。
-    Given: ターミナルを持つスペースの見出し。When: Enter またはクリックで折りたたみ、再び展開する。Then: 配下の行が隠れて再表示され、ターミナル自体は動き続ける。
-  - [ ] 下端ボタンでサイドバーを折りたたみ、再び展開できる。
-    Given: 開いているサイドバー。When: 下端の `«` をクリックし、続けて `»` をクリックする。Then: 細い表示を経て一覧へ戻り、ターミナルの配置は保たれる。
+- Fold the list and open it again.
+  - [x] When the user folds and unfolds a space heading with Enter or a click, the sidebar can hide and show its terminal rows while the terminals keep running.
+  - [x] When the user clicks `«` and then `»`, the sidebar can collapse to a strip and expand again without changing the terminal windows.
 
-## スペースへの分類
+## Spaces
 
-- 起動ディレクトリと移動先からスペースを決める。
-  - [ ] repo 内のサブディレクトリで起動したプログラムは repo root のスペースに入る。
-    Given: 一時 Git リポジトリのサブディレクトリ。When: そこで dummy agent を起動する。Then: 実際の Git で求めた repo root が `herdr.space` とサイドバーに反映される。
-  - [ ] Git 管理外で起動したプログラムは起動ディレクトリのスペースに入る。
-    Given: Git 管理外のディレクトリ。When: そこで dummy agent を起動する。Then: そのディレクトリが `herdr.space` とサイドバーに反映される。
-  - [ ] ターミナル内で別の repo へ移動するとスペースが切り替わる。
-    Given: repo A にいる実際のシェル。When: attach を通して repo B へ `cd` する。Then: hc の foreground 更新を受けて、label と一覧の所属が repo B へ変わる。
-  - [ ] 同じ tab のターミナルでも各自のディレクトリでスペースが決まる。
-    Given: 同じ tab の2つのターミナル。When: 一方だけ別の repo へ移動する。Then: 移動した方の所属だけが変わり、もう一方の所属は変わらない。
+- Group terminals by the folder they run in.
+  - [ ] When a program starts in a subfolder of a git repository, the plugin can put it in the repository root's space.
+  - [ ] When a program starts outside any git repository, the plugin can put it in its start folder's space.
+  - [ ] When the user moves a shell into another repository with `cd`, the plugin can move it to that repository's space.
+  - [ ] When one of two terminals in the same tab moves to another repository, the plugin can change only that terminal's space.
 
-## 配置の保存と復元
+## Saving and restoring the layout
 
-- 配置を変更して Neovim を起動し直す。
-  - [ ] tab の並び・縦横の分割・ターミナルの割り当てが再起動後に復元される。
-    Given: 複数 tab と縦横の分割に異なるターミナルを配置した Neovim。When: 配置の保存後に終了し、新しい Neovim を起動する。Then: `herdr-core-nvim` に保存した配置と復元結果が一致し、各ターミナルを操作できる。
-  - [ ] window を閉じた配置は再起動後も閉じたまま復元される。
-    Given: 保存済みの複数 window。When: 1つを閉じて保存を待ち、Neovim を起動し直す。Then: 閉じた window は戻らず、そのターミナルは hc で動き続ける。
-  - [ ] ファイルを開いた Neovim でも配置を復元し、元のファイルを残す。
-    Given: hc に保存済みのターミナル配置。When: ファイルを指定して Neovim を起動し、プラグインを読み込む。Then: 保存済み配置が復元され、指定したファイルの window も残る。
+- Change the layout and start Neovim again.
+  - [ ] When Neovim restarts, the plugin can restore the tab order, the splits and the terminal in each window.
+  - [ ] When a window was closed before Neovim restarted, the plugin can leave it closed while its terminal keeps running in hc.
+  - [ ] When Neovim starts with a file, the plugin can restore the saved layout and keep the file's window.
 
-## 複数 Neovim の同期
+## Several Neovims
 
-- 2つの Neovim を同じ専用 hc 環境につなぐ。
-  - [ ] 一方で変更した名前とピンがもう一方へ反映される。
-    Given: 同じターミナルを一覧に表示する2つの Neovim。When: 一方のサイドバーで名前またはピンを変える。Then: hc の label を経由して、もう一方の一覧も更新される。
-  - [ ] 一方で変更した tab・分割・window の配置がもう一方へ反映される。
-    Given: 同じ配置を表示する2つの Neovim。When: 一方で tab・分割を追加し、またはターミナルの window を閉じる。Then: もう一方も同じ配置に収束し、閉じた window が復活しない。
-  - [ ] 後から起動した Neovim が既存の保存済み配置を空の配置で上書きしない。
-    Given: 一方の Neovim が保存した複数ターミナルの配置。When: もう一方を空の画面から起動する。Then: 既存の配置を復元し、先に起動した Neovim の配置も維持される。
-  - [ ] フォーカスとサイドバーの開閉はもう一方へ同期されない。
-    Given: 同じ配置を表示する2つの Neovim。When: 一方だけ別 window へ移動し、サイドバーを折りたたむ。Then: もう一方のフォーカスとサイドバーの開閉状態は変わらない。
+- Connect two Neovims to the same E2E hc environment.
+  - [ ] When one Neovim names or pins a terminal, the other Neovim's sidebar can show the change.
+  - [ ] When one Neovim adds a tab or split or closes a terminal window, the other Neovim can reach the same layout without bringing the closed window back.
+  - [ ] When a second Neovim starts with an empty screen, it can restore the saved layout without overwriting it.
+  - [ ] When one Neovim moves focus or collapses its sidebar, the other Neovim can keep its own focus and sidebar.
 
-## 状態・未読・通知
+## Status, unread and notifications
 
-- 共通の dummy agent から実際の状態報告を送る。
-  - [ ] dummy agent の状態変化が hc とサイドバーの状態表示に反映される。
-    Given: attach 済みの dummy agent。When: 入力に応じて OSC 7501 の `working`・`blocked`・`done` を報告させる。Then: 各状態が実際の hc とサイドバーの記号・highlight に反映される。
-  - [ ] 見ていないターミナルが blocked・done になると OS 通知が成功する。
-    Given: 非表示の dummy agent と実際の OS 通知機構。When: その agent が `blocked` または `done` を報告する。Then: 名前と状態を含む既定の通知コマンドが成功し、Linux では dunst の受信ログにも残る。
-  - [ ] 前面で表示中のターミナルが blocked・done になっても通知しない。
-    Given: 前面の Neovim に表示中の dummy agent。When: `blocked` または `done` を報告させる。Then: サイドバーの状態は変わるが、その報告による OS 通知は増えない。
-  - [ ] 前面で done のターミナルを開くと既読がもう一方の Neovim にも反映される。
-    Given: 非表示のターミナルが done になり、2つの Neovim で未読になっている。When: 前面の一方でそのターミナルを開く。Then: `herdr.seen` と両方の未読表示が更新される。
-  - [ ] サイドバーから既読のターミナルを未読へ戻せる。
-    Given: 非表示で既読の done ターミナル。When: 一覧で `u` を入力する。Then: 実際の label と未読表示が更新される。
+- Send real status reports from the dummy agent.
+  - [ ] When the dummy agent reports `working`, `blocked` and `done` with OSC 7501, hc and the sidebar can show each status.
+  - [ ] When a terminal nobody looks at becomes blocked or done, the plugin can run the OS notification command successfully, and on Linux dunst can log it.
+  - [ ] When a terminal shown in the focused Neovim becomes blocked or done, the plugin can update the sidebar without a notification.
+  - [ ] When the user opens a done terminal in the focused Neovim, both Neovims can show it as read through `herdr.seen`.
+  - [ ] When the user presses `u` on a read done terminal, the plugin can mark it unread in its label and the sidebar.
 
-## CI と失敗調査
+## CI and failure records
 
-この節は実行基盤の受け入れ項目。Lua の振る舞いテストとは分け、対応する workflow の設定検査または実行結果を確認してから完了にする。
+These items check the CI workflow and its runs rather than Lua behavior.
 
-- Linux で最新 hc の定期 E2E を実行する。
-  - [ ] 定期 CI は毎日日本時間午前6時を目安とする予定を持ち、手動でも起動できる。
-    Given: E2E workflow。When: schedule と workflow_dispatch を確認する。Then: UTC 21時の毎日実行が設定され、手動起動の経路も存在する。
-  - [ ] CI は latest の配布物を検証してから同じバージョンで E2E を完走する。
-    Given: 公式 latest.json と配布物。When: Linux CI を実行する。Then: SHA-256 検証後の hc だけを使い、全ケースが成功して実際の版が記録される。
-  - [ ] 配布物のチェックサムが一致しなければ E2E を開始せず失敗する。
-    Given: 取得後に内容が壊れた配布物。When: 検証する。Then: 展開した hc を実行せず、非0で終了する。
-  - [ ] CI は失敗したテストの画面・メッセージ・hc の状態とログを取得可能にする。
-    Given: 既定の通知機構を含む実際の E2E 環境。When: ケースが失敗またはタイムアウトする。Then: そのケースの識別情報、画面、メッセージ、hc の状態とログが artifact に残り、後片づけも実行される。
+- Run E2E daily on Linux with the latest hc.
+  - [ ] When the E2E workflow is read, it can be scheduled daily around 6:00 in Japan (21:00 UTC) and started by hand.
+  - [ ] When CI runs on Linux, it can verify the latest hc release's SHA-256, run every case with that version and record the version.
+  - [ ] When a downloaded release does not match its checksum, the installer can fail without running the extracted hc.
+  - [ ] When a case fails or times out in CI, the run can keep the case name, screen, messages and hc state and logs as an artifact and still clean up.
 
-## 任意項目
+## Optional
 
-主要な利用経路の完成後に、対応価値と実装の複雑さで判断する。
+Decided after the main paths are done, by value and complexity.
 
-- 動作確認済みの hc と比較する。
-  - [ ] 動作確認済みの hc バージョンは全 E2E が成功したときだけ更新される。
-    Given: 直前の成功版の記録。When: latest の E2E が成功または失敗する。Then: 全件成功なら実行した版に更新し、失敗なら以前の記録を保つ。
-  - [ ] 同じプラグインコードの E2E を記録済みの hc バージョンでも実行できる。
-    Given: latest で失敗したプラグインの commit と記録済みの成功版。When: 比較実行を起動する。Then: プラグインの commit を変えずに指定版の hc で同じケースを実行し、両方の結果と版がわかる。
+- Compare with an hc version that worked.
+  - [ ] When every E2E case passes on the latest hc, CI can record that version, and keep the previous record when a case fails.
+  - [ ] When a comparison run is started, CI can run the same plugin commit against the recorded hc version and show both results and versions.
 
-- 操作と画面の trace を残す。
-  - [ ] 失敗時の trace から操作内容と画面の変化を時系列で確認できる。
-    Given: trace を有効にした E2E。When: 複数の操作を行った後にケースが失敗する。Then: 操作内容・時刻・区切りごとの画面を対応づけた記録を CI から取得できる。
+- Keep a trace of operations and screens.
+  - [ ] When a traced case fails, CI can provide the operations, times and screens in order.
 
-## 対象外
+## Out of scope
 
-リモート接続、実際の Claude・Codex の認証やモデル応答、OS 通知の実際のデスクトップでの表示、画面の完全一致、動画・再生ビューアは自動 E2E の対象にしない。
+Remote machines, real Claude Code and Codex authentication and model replies, notifications appearing on a real desktop, exact screen matches, and videos or replay viewers.
