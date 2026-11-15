@@ -85,6 +85,7 @@ These items check the CI workflow and its runs rather than Lua behavior.
   - [x] When the E2E workflow is read, it can be scheduled daily around 6:00 in Japan (21:00 UTC) and started by hand.
   - [x] When CI runs on Linux, it can verify the SHA-256 of the hc version in `mise.toml`, run every case with that version and record the version.
   - [ ] When Renovate proposes a newer hc version, CI can run the E2E on that pull request with the new version.
+  - [ ] When Renovate updates something other than Neovim, Node.js or hc, CI can skip the E2E on that pull request.
   - [x] When the workflow is started by hand with an hc version, CI can run the E2E with that version instead.
   - [x] When a downloaded release does not match its checksum, the installer can fail without running the extracted hc.
   - [x] When a case fails or times out in CI, the run can keep the case name, screen, messages and hc state and logs as an artifact and still clean up.
