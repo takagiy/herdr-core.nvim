@@ -48,17 +48,17 @@ Neovim, the plugin, hc, the Node.js dummy agent, the shell and the notification 
 ## Spaces
 
 - Group terminals by the folder they run in.
-  - [ ] When a program starts in a subfolder of a git repository, the plugin can put it in the repository root's space.
-  - [ ] When a program starts outside any git repository, the plugin can put it in its start folder's space.
-  - [ ] When the user moves a shell into another repository with `cd`, the plugin can move it to that repository's space.
-  - [ ] When one of two terminals in the same tab moves to another repository, the plugin can change only that terminal's space.
+  - [x] When a program starts in a subfolder of a git repository, the plugin can put it in the repository root's space.
+  - [x] When a program starts outside any git repository, the plugin can put it in its start folder's space.
+  - [x] When the user moves a shell into another repository with `cd`, the plugin can move it to that repository's space.
+  - [x] When one of two terminals in the same tab moves to another repository, the plugin can change only that terminal's space.
 
 ## Saving and restoring the layout
 
 - Change the layout and start Neovim again.
-  - [ ] When Neovim restarts, the plugin can restore the tab order, the splits and the terminal in each window.
-  - [ ] When a window was closed before Neovim restarted, the plugin can leave it closed while its terminal keeps running in hc.
-  - [ ] When Neovim starts with a file, the plugin can restore the saved layout and keep the file's window.
+  - [x] When Neovim restarts, the plugin can restore the tab order, the splits and the terminal in each window.
+  - [x] When a window was closed before Neovim restarted, the plugin can leave it closed while its terminal keeps running in hc.
+  - [x] When Neovim starts with a file, the plugin can restore the saved layout and keep the file's window.
 
 ## Several Neovims
 

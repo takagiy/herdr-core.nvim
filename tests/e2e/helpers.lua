@@ -5,7 +5,8 @@ local project = vim.fn.getcwd()
 ---@param predicate   fun(): boolean
 ---@param description string
 function M.wait(predicate, description)
-    assert(vim.wait(10000, predicate, 20), "Timed out: " .. description)
+    -- Asking the child too often keeps its scheduled callbacks, such as saving the layout, from running.
+    assert(vim.wait(10000, predicate, 200), "Timed out: " .. description)
 end
 
 ---@return table
