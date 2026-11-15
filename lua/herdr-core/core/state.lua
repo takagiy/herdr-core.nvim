@@ -169,7 +169,8 @@ function M.update(state, event)
         ---@type HerdrCoreTerminal?
         local terminal = next_terminals[event.terminal]
         if not terminal then return state, {} end
-        if not event.folder then
+        local before = state.terminals[event.terminal]
+        if not event.folder or (before and before.folder == event.folder) then
             return with(state, { terminals = next_terminals, spaces = state.spaces, layout = state.layout }), {}
         end
         local next_spaces, effects = spaces.update(state.spaces, {

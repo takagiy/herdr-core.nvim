@@ -323,4 +323,25 @@ T["returns the sidebar rows and the waiting count in a stable order"] = function
     MiniTest.expect.equality(describe(again), describe(rows))
 end
 
+-- When a foreground program changes without the folder changing, `update` can skip looking up the repository root again.
+T["skips the repository lookup when only the foreground program changes"] = function ()
+    -- Given a terminal whose folder is /app
+    local core = require("herdr-core.core.state")
+    local state = core.new()
+    state.terminals.t1 = terminal("t1", { program = "pwsh" })
+    -- When cargo comes to the foreground in the same folder
+    local updated, effects = core.update(
+        state,
+        {
+            type = "foreground_changed",
+            terminal = "t1",
+            folder = "/app",
+            program = "cargo"
+        }
+    )
+    -- Then the program is stored and no lookup is asked for
+    MiniTest.expect.equality(updated.terminals.t1.program, "cargo")
+    MiniTest.expect.equality(effects, {})
+end
+
 return T
