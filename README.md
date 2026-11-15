@@ -10,19 +10,21 @@ A TUI client for [herdr-core](https://github.com/herdrdev/herdr-core), built on 
 
 ## Usage
 
-The sidebar lists terminal sessions in herdr-core, grouped by working directory.
+The sidebar groups terminal sessions into spaces by Git repository root, or by working directory outside a repository.
 
-- On a project's row, press Enter or click to fold or unfold it.
-- On a project's row, press `n` or click `+` to start a terminal session there.
+- Press `j`/`k` or `Up`/`Down` to move between items.
+- On a space's row, press `n` or click `+` to start a terminal session there.
 - On a terminal session's row, press Enter or click to open it.
 - On a terminal session's row, press `r` to name it, `p` to pin it, or `u` to mark it unread.
-- At the bottom of the sidebar, click `«` to toggle it.
+- Click `«` at the bottom right to collapse the sidebar, or `»` to expand it.
+
+Closing a terminal window leaves its session running in herdr-core. Terminal layouts are restored when Neovim restarts and synchronized between Neovim instances.
 
 ## Installation
 
 With lazy.nvim:
 
-The plugin maps no keys by itself. The `setup({ ... })` below shows defaults.
+The plugin maps no global keys. This example uses the default sidebar settings.
 
 ```lua
 {
@@ -42,10 +44,6 @@ The plugin maps no keys by itself. The `setup({ ... })` below shows defaults.
                 pin = "p",
                 unread = "u",
             },
-            -- Called as notify(name, status) when a terminal needs you.
-            notify = function(name, status)
-                ...
-            end,
         })
         if not app.actions then return end
         vim.keymap.set({ "n", "t" }, "<leader>ht", app.actions.new_tab)
@@ -56,3 +54,5 @@ The plugin maps no keys by itself. The `setup({ ... })` below shows defaults.
     end,
 }
 ```
+
+Notifications use your OS notification service by default.
