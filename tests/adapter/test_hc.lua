@@ -707,4 +707,25 @@ T["reports a folder the same way whichever separator hc used"] = function ()
     MiniTest.expect.equality(assert(changed).folder, assert(assert(listed).terminals[1]).folder)
 end
 
+-- When the event stream closes, the hc adapter can report that it closed.
+T["reports that the event stream closed"] = function ()
+    -- Given an event stream
+    ---@type fun(result: vim.SystemCompleted)?
+    local exit
+    ---@param _        string[]
+    ---@param _options vim.SystemOpts?
+    ---@param on_exit? fun(result: vim.SystemCompleted)
+    ---@return vim.SystemObj
+    vim.system = function (_, _options, on_exit)
+        exit = on_exit
+        return { kill = function () end, write = function () end } --[[@as vim.SystemObj]]
+    end
+    local closed = false
+    require("herdr-core.adapter.hc").watch(function () end, function () closed = true end)
+    -- When hc events exits, as it does when the core restarts
+    assert(exit)({ code = 1, signal = 0, stdout = "", stderr = "core restarted" })
+    -- Then the caller learns that the stream closed
+    MiniTest.expect.equality(closed, true)
+end
+
 return T

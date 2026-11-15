@@ -14,3 +14,4 @@ Calls to the `hc` CLI, turned into core events.
 - [x] When a terminal runs on another machine, the hc adapter can address it as `<machine>/<address>`.
 - [x] When `hc` is missing or the core cannot start, the hc adapter can report why.
 - [x] When hc reports the same folder with backslashes in one place and slashes in another, the hc adapter can report both as the same folder.
+- [x] When the event stream closes, the hc adapter can report that it closed.

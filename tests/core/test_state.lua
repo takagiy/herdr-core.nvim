@@ -330,15 +330,12 @@ T["skips the repository lookup when only the foreground program changes"] = func
     local state = core.new()
     state.terminals.t1 = terminal("t1", { program = "pwsh" })
     -- When cargo comes to the foreground in the same folder
-    local updated, effects = core.update(
-        state,
-        {
-            type = "foreground_changed",
-            terminal = "t1",
-            folder = "/app",
-            program = "cargo"
-        }
-    )
+    local updated, effects = core.update(state, {
+        type = "foreground_changed",
+        terminal = "t1",
+        folder = "/app",
+        program = "cargo"
+    })
     -- Then the program is stored and no lookup is asked for
     MiniTest.expect.equality(updated.terminals.t1.program, "cargo")
     MiniTest.expect.equality(effects, {})

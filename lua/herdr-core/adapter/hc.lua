@@ -337,9 +337,10 @@ local function fact(message)
     return nil
 end
 
----@param callback fun(event: HerdrCoreEvent?, err: string?)
+---@param callback   fun(event: HerdrCoreEvent?, err: string?)
+---@param on_closed? fun()
 ---@return fun()
-function M.watch(callback)
+function M.watch(callback, on_closed)
     local pending = ""
     local active = true
     local sequence = -1
@@ -399,7 +400,9 @@ function M.watch(callback)
             end
         },
         function (result)
-            if active then callback(nil, result.stderr ~= "" and result.stderr or "hc event stream closed") end
+            if not active then return end
+            callback(nil, result.stderr ~= "" and result.stderr or "hc event stream closed")
+            if on_closed then on_closed() end
         end
     )
     if not ok then
