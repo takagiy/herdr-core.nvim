@@ -166,34 +166,22 @@ T["preserves the name and pin after restarting Neovim"] = function ()
     eq(session.row(child, "saved-agent") < session.row(child, "other"), true)
 end
 
--- When the user folds and unfolds a space heading with Enter or a click, the sidebar can hide and show its terminal rows while the terminals keep running.
 ---@param method string
-activation["collapses and expands a heading while its terminals stay running"] = function (method)
+activation["keeps terminal rows visible when a space heading is activated"] = function (method)
     -- Given: a space heading containing a live terminal
     local address = session.spawn()
     local child = session.editor()
     session.row(child, "agent")
-    -- When: the user folds and unfolds the space heading
-    activate(
-        child,
-        vim.fs.basename(
-            session.root --[[@as string]]
-        ),
-        method
+    local heading = vim.fs.basename(
+        session.root --[[@as string]]
     )
-    -- Then: its terminal row disappears without stopping the program, and returns on expansion
-    session.wait(function () return not session.text(child):find("agent", 1, true) end, "terminal row hidden")
-    eq(session.hc({ "get", "--json", address }).state, "live")
-    activate(
-        child,
-        vim.fs.basename(
-            session.root --[[@as string]]
-        ),
-        method
-    )
+    -- When: the user presses Enter or clicks on the space heading
+    activate(child, heading, method)
+    -- Then: its terminal stays visible and usable
     session.row(child, "agent")
+    eq(session.hc({ "get", "--json", address }).state, "live")
     session.choose(child, address)
-    reply(child, "after-heading-fold")
+    reply(child, "after-heading-activation")
 end
 
 -- When the user clicks `«` and then `»`, the sidebar can collapse to a strip and expand again without changing the terminal windows.

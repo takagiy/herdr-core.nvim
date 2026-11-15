@@ -89,7 +89,7 @@ T["plus button"] = plus
 ---@param root    string
 ---@param waiting integer
 plus["starts a terminal at the visible plus after Unicode text"] = function (root, waiting)
-    -- Given a heading with a Unicode fold marker, optional count, and project name
+    -- Given a heading with a optional count and project name
     child.lua("sidebar.render({ { kind='space', root=..., waiting=select(2, ...), lines={} } }, 0)", { root, waiting })
     local buffer = child.lua_get("sidebar.buffer")
     local heading = assert(child.api.nvim_buf_get_lines(buffer, 1, 2, false)[1])
@@ -97,6 +97,30 @@ plus["starts a terminal at the visible plus after Unicode text"] = function (roo
     click(child.lua_get("side"), 2, #heading)
     -- Then it requests a terminal instead of toggling the project's fold
     MiniTest.expect.equality(child.lua_get("actions"), { { "new_terminal", root } })
+end
+
+T["keeps the footer toggle at the right edge when resized and collapsed"] = function ()
+    -- Given a sidebar resized from its configured width
+    local side = child.lua_get("side")
+    child.api.nvim_win_set_width(side, 24)
+    child.lua("vim.api.nvim_exec_autocmds('WinResized', {})")
+    local buffer = child.lua_get("sidebar.buffer")
+    local function footer()
+        local line = child.api.nvim_buf_line_count(buffer)
+        local text = assert(child.api.nvim_buf_get_lines(buffer, line - 1, line, false)[1])
+        return line, text
+    end
+    local line, text = footer()
+    -- When inspecting and clicking the visible toggle at the right edge
+    MiniTest.expect.equality(child.fn.strdisplaywidth(text), 24)
+    MiniTest.expect.equality(text, string.rep(" ", 23) .. "«")
+    click(side, line, #text - 1)
+    local narrow_line, narrow_text = footer()
+    -- Then the collapsed toggle is also right-aligned and can expand again
+    MiniTest.expect.equality(child.api.nvim_win_get_width(side), 3)
+    MiniTest.expect.equality(narrow_text, "  »")
+    click(side, narrow_line, #narrow_text - 1)
+    MiniTest.expect.equality(child.api.nvim_win_get_width(side), 32)
 end
 
 return T

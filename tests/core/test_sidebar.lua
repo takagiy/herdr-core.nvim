@@ -184,19 +184,6 @@ T["shows the waiting count on a space heading"] = function ()
     MiniTest.expect.equality(assert(rows[1]).waiting, 2)
 end
 
-T["folds project rows but keeps their waiting count"] = function ()
-    -- Given a project containing a blocked terminal
-    local sidebar = require("herdr-core.core.sidebar")
-    local items = { terminal("t1", "/app", { status = "blocked" }) }
-    local previous, initial = sidebar.update(nil, items)
-    -- When the project is folded
-    local _, rows = sidebar.update(previous, items, { folded = { [assert(assert(initial[1]).id)] = true } })
-    -- Then only its heading remains with the waiting count
-    MiniTest.expect.equality(#rows, 1)
-    MiniTest.expect.equality(assert(rows[1]).waiting, 1)
-    MiniTest.expect.equality(assert(rows[1]).folded, true)
-end
-
 T["reduces a collapsed sidebar to the total waiting count"] = function ()
     -- Given two waiting terminals in different projects
     local sidebar = require("herdr-core.core.sidebar")

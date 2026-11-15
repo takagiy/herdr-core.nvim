@@ -48,7 +48,7 @@ T["draws headings counts and two-line terminals with highlights"] = function ()
     sidebar.close()
     -- Then the terminal name and program occupy separate lines
     MiniTest.expect.equality(
-        { lines[1], lines[2], lines[3], lines[4] }, { "  HERDR", "  ▾ app  · 2  +", "  ◐ build", "    claude" }
+        { lines[1], lines[2], lines[3], lines[4] }, { "  HERDR", "  app  · 2  +", "  ◐ build", "    claude" }
     )
     MiniTest.expect.equality(#marks > 0, true)
     local badge
@@ -57,7 +57,7 @@ T["draws headings counts and two-line terminals with highlights"] = function ()
         if details.virt_text_pos == "right_align" then badge = details.virt_text end
     end
     MiniTest.expect.equality(badge, { { "2 waiting  ", "HerdrCoreBlocked" } })
-    MiniTest.expect.equality(lines[#lines], "«")
+    MiniTest.expect.equality(lines[#lines], string.rep(" ", 31) .. "«")
 end
 
 -- When the user switches tabpages, the sidebar can stay on the same side and width.
@@ -107,24 +107,30 @@ T["reports a terminal chosen with Enter or a mouse click"] = function ()
     MiniTest.expect.equality(chosen, { { "activate", "t1" }, { "activate", "t1" } })
 end
 
--- When the user presses Enter or clicks on a heading, the sidebar can report the heading as folded or unfolded.
-T["reports heading activation so the app can toggle its fold"] = function ()
-    -- Given a space heading with its stable id
+T["ignores Enter and clicks on space headings"] = function ()
+    -- Given a space heading above a terminal
     local chosen = {}
-    local row = { kind = "space", id = "space1", root = "/app", lines = {} }
-    local sidebar = require("herdr-core.ui.sidebar").create(function (action, selected)
-        chosen[#chosen + 1] = { action, selected and selected.id }
+    local sidebar = require("herdr-core.ui.sidebar").create(function (action)
+        chosen[#chosen + 1] = action
     end)
     local window = sidebar.show()
-    sidebar.render({ row }, 0)
+    sidebar.render({
+        { kind = "space", root = "/app", lines = {} },
+        { kind = "terminal", address = "t1", lines = { "review", "claude" } }
+    }, 0)
     vim.api.nvim_set_current_win(window)
     vim.api.nvim_win_set_cursor(window, { 2, 0 })
-    -- When the heading is activated twice
-    vim.fn.maparg("<CR>", "n", false, true).callback()
-    vim.fn.maparg("<CR>", "n", false, true).callback()
+    -- When Enter is pressed and the heading is clicked
+    vim.cmd("normal " .. vim.api.nvim_replace_termcodes("<CR>", true, false, true))
+    local getmousepos = vim.fn.getmousepos
+    vim.fn.getmousepos = function () return { winid = window, line = 2, column = 1 } end
+    press_mouse()
+    vim.fn.getmousepos = getmousepos
+    local heading = vim.api.nvim_buf_get_lines(sidebar.buffer, 1, 2, false)[1]
     sidebar.close()
-    -- Then both gestures identify the same heading for folding or unfolding
-    MiniTest.expect.equality(chosen, { { "activate", "space1" }, { "activate", "space1" } })
+    -- Then no action is emitted and no fold arrow is shown
+    MiniTest.expect.equality(chosen, {})
+    MiniTest.expect.equality(heading, "  app  +")
 end
 
 -- When the user presses `n` on a row or clicks a heading's `+`, the sidebar can report a new terminal for that row's space.
@@ -254,7 +260,9 @@ T["collapses to a narrow strip when the bottom button is clicked"] = function ()
     local window = sidebar.show(30)
     sidebar.render({ { kind = "terminal", address = "t1", status = "blocked", lines = { "t1", "claude" } } }, 1)
     local bottom = vim.api.nvim_buf_line_count(sidebar.buffer)
-    MiniTest.expect.equality(vim.api.nvim_buf_get_lines(sidebar.buffer, bottom - 1, bottom, false)[1], "«")
+    MiniTest.expect.equality(
+        vim.api.nvim_buf_get_lines(sidebar.buffer, bottom - 1, bottom, false)[1], string.rep(" ", 29) .. "«"
+    )
     -- When the button on the bottom line is clicked
     click(window, bottom)
     local width = vim.api.nvim_win_get_width(window)
@@ -281,7 +289,7 @@ T["shows the waiting count at the top and the expand button at the bottom when c
     -- Then the count stays on the top line and the button on the window's bottom line
     MiniTest.expect.equality(shown[1], "2")
     MiniTest.expect.equality(#shown, height)
-    MiniTest.expect.equality(shown[#shown], "»")
+    MiniTest.expect.equality(shown[#shown], "  »")
 end
 
 -- When the user clicks `»`, the sidebar can expand again.
@@ -376,13 +384,13 @@ end
 
 -- When the user clicks the same place again quickly, the sidebar can treat the second click like the first.
 T["treats a quick second click like the first"] = function ()
-    -- Given a heading that the user has just clicked
+    -- Given a terminal that the user has just clicked
     local reported = {}
     local sidebar = require("herdr-core.ui.sidebar").create(function (action, row)
-        reported[#reported + 1] = { action, row and row.id }
+        reported[#reported + 1] = { action, row and row.address }
     end)
     local window = sidebar.show()
-    sidebar.render({ { kind = "space", id = "/app", root = "/app", lines = {} } }, 0)
+    sidebar.render({ { kind = "terminal", address = "t1", lines = { "review", "claude" } } }, 0)
     vim.api.nvim_set_current_win(window)
     local getmousepos = vim.fn.getmousepos
     vim.fn.getmousepos = function () return { winid = window, line = 2, column = 1 } end
@@ -391,8 +399,8 @@ T["treats a quick second click like the first"] = function ()
     press_mouse("<2-LeftMouse>")
     vim.fn.getmousepos = getmousepos
     sidebar.close()
-    -- Then both clicks fold or unfold the heading
-    MiniTest.expect.equality(reported, { { "activate", "/app" }, { "activate", "/app" } })
+    -- Then both clicks activate the terminal
+    MiniTest.expect.equality(reported, { { "activate", "t1" }, { "activate", "t1" } })
 end
 
 T["moves between sidebar items instead of display lines"] = function ()

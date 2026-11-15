@@ -57,7 +57,9 @@ function M.create(on_action, keys)
             return
         end
         local action = column and plus[line] == column and "new_terminal" or "activate"
-        if on_action then on_action(action, by_line[line]) end
+        local row = by_line[line]
+        if action == "activate" and row and row.kind == "space" then return end
+        if on_action then on_action(action, row) end
     end
     ---@param direction integer
     local function move(direction)
@@ -178,9 +180,7 @@ function M.create(on_action, keys)
             local start = #lines + 1
             if row.kind == "space" then
                 local count = (row.waiting or 0) > 0 and "  · " .. row.waiting or ""
-                lines[#lines + 1] = "  " .. (row.folded and "▸" or "▾")
-                    .. " " .. vim.fs.basename(row.root or "")
-                    .. count .. "  +"
+                lines[#lines + 1] = "  " .. vim.fs.basename(row.root or "") .. count .. "  +"
                 -- getmousepos().column is a byte position, not a screen column.
                 plus[#lines] = #lines[#lines]
                 marks[#marks + 1] = { row = #lines - 1, group = "HerdrCoreSpace" }
@@ -215,14 +215,17 @@ function M.create(on_action, keys)
             end
         end
         -- The toggle sits on the window's bottom line, below the rows.
-        local height = 0
+        local height, footer_width = 0, collapsed and 3 or width
         for _, window in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-            if vim.api.nvim_win_get_buf(window) == buffer then height = vim.api.nvim_win_get_height(window) end
+            if vim.api.nvim_win_get_buf(window) == buffer then
+                height = vim.api.nvim_win_get_height(window)
+                footer_width = vim.api.nvim_win_get_width(window)
+            end
         end
         while #lines < height - 1 do
             lines[#lines + 1] = ""
         end
-        lines[#lines + 1] = collapsed and "»" or "«"
+        lines[#lines + 1] = string.rep(" ", math.max(0, footer_width - 1)) .. (collapsed and "»" or "«")
         marks[#marks + 1] = { row = #lines - 1, group = "HerdrCoreMuted" }
         footer = #lines
         positions[#positions + 1] = footer

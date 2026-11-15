@@ -7,7 +7,6 @@ local attention = require("herdr-core.core.attention")
 ---@field address   string?
 ---@field machine   string?
 ---@field connected boolean?
----@field folded    boolean?
 ---@field status    string?
 ---@field lines     string[]
 ---@field waiting   integer?
@@ -100,9 +99,7 @@ function M.update(previous, terminals, options)
         if not machine_folded then
             table.insert(rows, {
                 kind = "space",
-                id = root,
                 root = group.root,
-                folded = options.folded and options.folded[root] or false,
                 machine = group.machine,
                 lines = {},
                 waiting = waiting
@@ -112,7 +109,7 @@ function M.update(previous, terminals, options)
             terminal_index = terminal_index + 1
             state.terminals[terminal.address] = terminal_index
             state.locations[terminal.address] = root
-            if not machine_folded and (not options.folded or not options.folded[root]) then
+            if not machine_folded then
                 local program = (terminal.program or ""):match([=[[^/\]+$]=]) or ""
                 program = program:gsub("%.[eE][xX][eE]$", "")
                 table.insert(rows, {
