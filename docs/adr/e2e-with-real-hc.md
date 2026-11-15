@@ -43,7 +43,7 @@ dummy agent で必要な状態変化を扱えなければ、hc の正式な API 
 ### hc の版を固定し、新しい版は Renovate の PR で確かめる
 
 - E2E が使う hc の版は `mise.toml` の `HC_VERSION` に書き、リポジトリで固定する。`main` に入っている版が、E2E が通った版になる。
-- Renovate が `releases.herdr.dev/core/latest.json` を見て、新しい版が出たら `HC_VERSION` を上げる PR を作る。E2E は PR でも実行し、その PR で新しい版を確かめる。
+- Renovate が `releases.herdr.dev/core/latest.json` を見て、新しい版が出たら `HC_VERSION` を上げる PR を作る。E2E は PR でも実行し、その PR で新しい版を確かめる。Renovate の PR では、E2E が動く土台（Neovim、Node.js、hc）を更新するときだけ実行し、GitHub Actions などの更新では実行しない。
 - Linux で毎日、日本時間の午前6時を目安にも実行する。手動起動では、別の版を指定して実行できる（以前に通った版との比較など）。
 - 任意項目として、操作内容と時刻、操作の区切りごとの画面を trace として残し、失敗時に CI から取得できるようにする。動画や再生ビューアは初期実装に含めない。
 

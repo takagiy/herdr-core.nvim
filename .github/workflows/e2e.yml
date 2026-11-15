@@ -16,6 +16,13 @@ permissions:
 
 jobs:
   e2e:
+    # Renovate pull requests run the E2E only when they update what it runs on.
+    if: >-
+      github.event_name != 'pull_request'
+      || !startsWith(github.head_ref, 'renovate/')
+      || startsWith(github.head_ref, 'renovate/neovim')
+      || startsWith(github.head_ref, 'renovate/node')
+      || startsWith(github.head_ref, 'renovate/hc')
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     defaults:
