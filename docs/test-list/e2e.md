@@ -83,7 +83,7 @@ These items check the CI workflow and its runs rather than Lua behavior.
 
 - Run E2E daily on Linux with the latest hc.
   - [x] When the E2E workflow is read, it can be scheduled daily around 6:00 in Japan (21:00 UTC) and started by hand.
-  - [ ] When CI runs on Linux, it can verify the latest hc release's SHA-256, run every case with that version and record the version.
+  - [x] When CI runs on Linux, it can verify the latest hc release's SHA-256, run every case with that version and record the version.
   - [x] When a downloaded release does not match its checksum, the installer can fail without running the extracted hc.
   - [x] When a case fails or times out in CI, the run can keep the case name, screen, messages and hc state and logs as an artifact and still clean up.
 
