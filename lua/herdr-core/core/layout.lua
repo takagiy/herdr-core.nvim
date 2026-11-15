@@ -122,6 +122,7 @@ function M.update(state, event)
             { { type = "show_layout", value = value }, { type = "save_layout", value = value, version = state.version } }
     end
     if event.type == "layout_conflict" then
+        if event.version < state.version then return state, {} end
         local tabs = {}
         local base = by_id(state.base or state.value)
         local ours = by_id(state.value)

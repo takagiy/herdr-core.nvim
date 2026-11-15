@@ -19,3 +19,4 @@ The core's single entry point.
 - [x] When the user marks a terminal unread, `update` can ask to lower its `herdr.seen` label.
 - [x] When the state changes, `view` can return the sidebar rows and the number of terminals waiting, keeping their order.
 - [x] When a foreground program changes without the folder changing, `update` can skip looking up the repository root again.
+- [x] When a sidebar action is requested, `update` can return the corresponding UI effect.

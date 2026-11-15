@@ -270,4 +270,19 @@ T["clears restored terminal windows when the shared value is deleted"] = functio
     MiniTest.expect.equality(effects, { { type = "show_layout", value = { tabs = {} } } })
 end
 
+T["ignores a delayed conflict older than the current layout"] = function ()
+    -- Given version 3 where all tabs have been removed
+    local layout = require("herdr-core.core.layout")
+    local state = { value = { tabs = {} }, version = 3 }
+    -- When a delayed conflict response carries version 2 with a deleted tab
+    local updated, effects = layout.update(state, {
+        type = "layout_conflict",
+        version = 2,
+        value = { tabs = { { id = "deleted", root = { kind = "terminal", id = "w1", terminal = "t1" } } } }
+    })
+    -- Then it cannot move the version backwards or restore the deleted tab
+    MiniTest.expect.equality(updated, state)
+    MiniTest.expect.equality(effects, {})
+end
+
 return T

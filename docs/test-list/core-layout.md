@@ -21,3 +21,4 @@ The tabpages, splits and terminals that every Neovim shares.
 - [x] When another editor's layout arrives while local changes are pending, layout can merge them without dropping the local changes.
 
 - [x] When a terminal absent from the layout ends, layout can leave its windows and shared data unchanged.
+- [x] When a conflict response is older than the current layout version, layout can ignore it.

@@ -12,14 +12,15 @@ function M.name(terminal)
     return "herdr://" .. (terminal.machine and terminal.machine .. "/" or "") .. name
 end
 
----@param terminal HerdrCoreTerminalIdentity
----@param command  string[]
+---@param terminal  HerdrCoreTerminalIdentity
+---@param command   string[]
+---@param existing? integer
 ---@return integer
-function M.buffer(terminal, command)
+function M.buffer(terminal, command, existing)
     for _, buffer in ipairs(vim.api.nvim_list_bufs()) do
         if vim.b[buffer].herdr_core_address == terminal.address then return buffer end
     end
-    local buffer = vim.api.nvim_create_buf(true, false)
+    local buffer = existing or vim.api.nvim_create_buf(true, false)
     vim.b[buffer].herdr_core_address = terminal.address
     local ok, failure = pcall(function ()
         vim.api.nvim_buf_call(buffer, function ()

@@ -6,6 +6,14 @@ local open = require("herdr-core.core.open")
 local sidebar = require("herdr-core.core.sidebar")
 local M = {}
 
+---@class HerdrCoreSidebarRequested
+---@field type   'sidebar_requested'
+---@field action 'toggle' | 'focus'
+
+---@class HerdrCoreSidebarEffect
+---@field type   'sidebar'
+---@field action 'toggle' | 'focus'
+
 ---@class HerdrCoreState
 ---@field terminals HerdrCoreTerminals
 ---@field spaces    HerdrCoreSpaces
@@ -41,8 +49,8 @@ local M = {}
 ---@field terminal string
 ---@field windows  table<string, string>
 
----@alias HerdrCoreEvent HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreHeadingToggled | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict
----@alias HerdrCoreEffect HerdrCoreSetLabel | HerdrCoreSpaceEffect | HerdrCoreLayoutEffect | HerdrCoreOpenEffect | HerdrCoreNotify | HerdrCoreRunShell
+---@alias HerdrCoreEvent HerdrCoreSidebarRequested | HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreHeadingToggled | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict
+---@alias HerdrCoreEffect HerdrCoreSidebarEffect | HerdrCoreSetLabel | HerdrCoreSpaceEffect | HerdrCoreLayoutEffect | HerdrCoreOpenEffect | HerdrCoreNotify | HerdrCoreRunShell
 
 ---@class HerdrCoreUnknownEvent
 ---@field type 'unknown'
@@ -75,9 +83,12 @@ local function with(state, changes)
 end
 
 ---@param state HerdrCoreState
----@param event HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreHeadingToggled | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict | HerdrCoreUnknownEvent
+---@param event HerdrCoreSidebarRequested | HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreHeadingToggled | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict | HerdrCoreUnknownEvent
 ---@return HerdrCoreState, HerdrCoreEffect[]
 function M.update(state, event)
+    if event.type == "sidebar_requested" then
+        return state, { { type = "sidebar", action = event.action } }
+    end
     if event.type == "unread_requested" then
         ---@type HerdrCoreTerminal?
         local terminal = state.terminals[event.terminal]

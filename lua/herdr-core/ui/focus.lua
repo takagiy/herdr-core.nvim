@@ -8,6 +8,7 @@ local M = {}
 ---@return fun()
 function M.watch(callback)
     local focused = true
+    local active, queued = true, false
     local group = vim.api.nvim_create_augroup("HerdrCoreFocus", { clear = true })
     local function report()
         local terminals = {}
@@ -31,10 +32,20 @@ function M.watch(callback)
     })
     vim.api.nvim_create_autocmd({ "WinEnter", "BufEnter", "TabEnter", "BufWinEnter" }, {
         group = group,
-        callback = report
+        callback = function ()
+            if queued then return end
+            queued = true
+            vim.schedule(function ()
+                queued = false
+                if active then report() end
+            end)
+        end
     })
     report()
-    return function () vim.api.nvim_del_augroup_by_id(group) end
+    return function ()
+        active = false
+        vim.api.nvim_del_augroup_by_id(group)
+    end
 end
 
 return M

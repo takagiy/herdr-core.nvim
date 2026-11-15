@@ -7,6 +7,7 @@ local symbols = { working = "◐", blocked = "●", error = "✗", done = "✓",
 ---@field render fun(rows: HerdrCoreSidebarRow[], waiting: integer?)
 ---@field show   fun(width: integer?): integer
 ---@field close  fun()
+---@field toggle fun()
 
 ---@class HerdrCoreSidebarKeys
 ---@field activate?     string
@@ -166,7 +167,7 @@ function M.create(on_action, keys)
         end
         vim.api.nvim_buf_delete(buffer, { force = true })
     end
-    return { buffer = buffer, render = render, show = show, close = close }
+    return { buffer = buffer, render = render, show = show, close = close, toggle = toggle }
 end
 
 return M

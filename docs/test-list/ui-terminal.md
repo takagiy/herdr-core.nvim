@@ -8,3 +8,4 @@ Terminal buffers in Neovim.
 - [x] When the cursor enters a terminal window, the window can switch to terminal mode.
 - [x] When the user turns automatic terminal mode off, the window can stay in normal mode on entry.
 - [x] When the buffer of a terminal window is wiped, the terminal's program can keep running in the core.
+- [x] When a terminal URI already has a read buffer, attach can reuse that buffer without a duplicate name.

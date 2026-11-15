@@ -341,4 +341,13 @@ T["skips the repository lookup when only the foreground program changes"] = func
     MiniTest.expect.equality(effects, {})
 end
 
+T["returns sidebar requests as view effects"] = function ()
+    -- Given the core state
+    local core = require("herdr-core.core.state")
+    -- When a sidebar action arrives
+    local _, effects = core.update(core.new(), { type = "sidebar_requested", action = "toggle" })
+    -- Then the UI is asked to carry it out
+    MiniTest.expect.equality(effects, { { type = "sidebar", action = "toggle" } })
+end
+
 return T

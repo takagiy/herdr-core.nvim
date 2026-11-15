@@ -130,4 +130,17 @@ T["keeps the program running in the core when its buffer is wiped"] = function (
     MiniTest.expect.equality(record.state, "live")
 end
 
+T["attaches inside the existing URI read buffer"] = function ()
+    -- Given the named buffer Neovim created before BufReadCmd
+    local existing = vim.api.nvim_create_buf(true, false)
+    vim.api.nvim_buf_set_name(existing, "herdr://existing")
+    -- When the URI handler attaches using that buffer
+    local terminal = require("herdr-core.ui.terminal")
+    local attached = terminal.buffer({ address = "existing" }, { vim.v.progpath, "--version" }, existing)
+    -- Then it reuses the buffer without creating a duplicate URI
+    MiniTest.expect.equality(attached, existing)
+    MiniTest.expect.equality(vim.bo[attached].buftype, "terminal")
+    vim.api.nvim_buf_delete(attached, { force = true })
+end
+
 return T
