@@ -11,3 +11,10 @@ The core's single entry point.
 - [x] When a repository root result arrives for an old folder or ended terminal, `update` can ignore it.
 - [x] When layout events arrive, `update` can return the layout state and effects.
 - [x] When an event's type is unknown, `update` can return the state unchanged with no effects.
+- [x] When Neovim gains focus or shows other terminals, `update` can ask to mark each shown terminal as seen.
+- [x] When a terminal becomes blocked or done while nobody looks at it, `update` can ask to notify the user.
+- [x] When the user chooses a terminal, `update` can ask to focus its window or to show it, as the opening policy decides.
+- [ ] When the user activates a heading, `update` can fold or unfold it.
+- [ ] When the user asks for a new terminal, `update` can ask for a shell where the opening policy decides.
+- [ ] When the user marks a terminal unread, `update` can ask to lower its `herdr.seen` label.
+- [ ] When the state changes, `view` can return the sidebar rows and the number of terminals waiting, keeping their order.

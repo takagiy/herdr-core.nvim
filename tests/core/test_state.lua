@@ -167,4 +167,74 @@ T["routes layout events to shared layout state"] = function ()
     MiniTest.expect.equality(effects, { { type = "show_layout", value = value } })
 end
 
+---@param address string
+---@param fields? table
+---@return HerdrCoreTerminal
+local function terminal(address, fields)
+    return vim.tbl_extend(
+        "force", { address = address, labels = {}, folder = "/app", turn = 0, created_ms = 1 }, fields or {}
+    ) --[[@as HerdrCoreTerminal]]
+end
+
+-- When Neovim gains focus or shows other terminals, `update` can ask to mark each shown terminal as seen.
+T["asks to mark the shown terminals as seen when Neovim is focused"] = function ()
+    -- Given a terminal that finished turn 2 and one that is not shown
+    local core = require("herdr-core.core.state")
+    local state = core.new()
+    state.terminals.t1 = terminal("t1", { turn = 2, labels = { ["herdr.seen"] = "1" } })
+    state.terminals.t2 = terminal("t2", { turn = 3, labels = { ["herdr.seen"] = "1" } })
+    -- When focused Neovim shows only the first
+    local _, effects = core.update(state, { type = "focus_changed", focused = true, terminals = { "t1" } })
+    -- Then only the shown terminal is marked seen up to its turn
+    MiniTest.expect.equality(effects, { { type = "set_label", terminal = "t1", key = "herdr.seen", value = "2" } })
+end
+
+-- When a terminal becomes blocked or done while nobody looks at it, `update` can ask to notify the user.
+T["asks to notify when a terminal nobody looks at becomes blocked"] = function ()
+    -- Given a working terminal named build, shown in a Neovim that is not focused, and a second shown in a focused one
+    local core = require("herdr-core.core.state")
+    local state = core.new()
+    state.terminals.t1 = terminal("t1", { status = "working", labels = { ["herdr-core-nvim.name"] = "build" } })
+    state.terminals.t2 = terminal("t2", { status = "working" })
+    local unfocused = core.update(state, { type = "focus_changed", focused = false, terminals = { "t1" } })
+    local focused = core.update(state, { type = "focus_changed", focused = true, terminals = { "t2" } })
+    -- When each becomes blocked
+    local _, notified = core.update(unfocused, {
+        type = "status_changed",
+        terminal = "t1",
+        status = "blocked",
+        status_ms = 2
+    })
+    local _, quiet = core.update(focused, {
+        type = "status_changed",
+        terminal = "t2",
+        status = "blocked",
+        status_ms = 2
+    })
+    -- Then only the one nobody looks at is notified
+    MiniTest.expect.equality(notified, { { type = "notify", terminal = "t1", name = "build", status = "blocked" } })
+    MiniTest.expect.equality(quiet, {})
+end
+
+-- When the user chooses a terminal, `update` can ask to focus its window or to show it, as the opening policy decides.
+T["asks to focus a chosen terminal's window or to show it"] = function ()
+    -- Given a terminal shown in window 1003 and one that is not shown, with the default policy and a custom one
+    local core = require("herdr-core.core.state")
+    local state = core.new()
+    local custom = core.new({
+        open = function (address)
+            return { type = "show_terminal", terminal = address, placement = "vertical" }
+        end
+    })
+    local windows = { t1 = "1003" }
+    -- When each is chosen
+    local _, shown = core.update(state, { type = "terminal_chosen", terminal = "t1", windows = windows })
+    local _, hidden = core.update(state, { type = "terminal_chosen", terminal = "t2", windows = windows })
+    local _, policy = core.update(custom, { type = "terminal_chosen", terminal = "t2", windows = windows })
+    -- Then the shown one is focused and the hidden one is shown as the policy decides
+    MiniTest.expect.equality(shown, { { type = "focus_window", window = "1003" } })
+    MiniTest.expect.equality(hidden, { { type = "show_terminal", terminal = "t2", placement = "tab" } })
+    MiniTest.expect.equality(policy, { { type = "show_terminal", terminal = "t2", placement = "vertical" } })
+end
+
 return T
