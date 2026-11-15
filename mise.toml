@@ -31,3 +31,8 @@ run = "luafmt . --write"
 [tasks.fmt-check]
 description = "Check formatting with luafmt"
 run = "luafmt . --check"
+
+[tasks.test]
+description = "Run the tests with mini.test"
+# MiniTest.run() quits when the cases finish, but stays open when there are none.
+run = "nvim --headless --noplugin -u scripts/minimal_init.lua -c \"lua MiniTest.run() if #MiniTest.current.all_cases == 0 then vim.cmd.qall() end\""

@@ -5,7 +5,11 @@
   },
   "workspace": {
     "library": [
-      "{env:VIMRUNTIME}/lua"
+      "{env:VIMRUNTIME}/lua",
+      "deps/mini.test-v0.18.0/lua"
+    ],
+    "ignoreGlobs": [
+      "deps/**"
     ]
   },
   "diagnostics": {
