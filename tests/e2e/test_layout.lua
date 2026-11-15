@@ -10,27 +10,6 @@ local T = MiniTest.new_set({
     }
 })
 
--- Each tab's window tree, with terminal windows by address and other windows left out.
-local describe = [[(function ()
-    local function node(tree)
-        if tree[1] == "leaf" then return vim.b[vim.api.nvim_win_get_buf(tree[2])].herdr_core_address end
-        local children = {}
-        for _, child in ipairs(tree[2]) do
-            local described = node(child)
-            if described then children[#children + 1] = described end
-        end
-        if #children == 0 then return nil end
-        if #children == 1 then return children[1] end
-        return { tree[1], children }
-    end
-    local tabs = {}
-    for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
-        local described = node(vim.fn.winlayout(vim.api.nvim_tabpage_get_number(tab)))
-        if described then tabs[#tabs + 1] = described end
-    end
-    return tabs
-end)()]]
-
 -- Whether the shared layout in the plugin's state still holds a window for the terminal.
 local holds = [[(function (address)
     local function walk(node)
@@ -73,13 +52,13 @@ T["restores tabs, splits and terminals after Neovim restarts"] = function ()
     local child = session.editor()
     open_split(child, first)
     session.choose(child, second)
-    local before = child.lua_get(describe)
+    local before = session.layout(child)
     wait_saved(child, 2)
     -- When: Neovim exits and starts again
     child.stop()
     local restarted = session.editor()
     -- Then: the same tabs, splits and terminals come back
-    session.wait(function () return vim.deep_equal(restarted.lua_get(describe), before) end, "restored layout")
+    session.wait(function () return vim.deep_equal(session.layout(restarted), before) end, "restored layout")
 end
 
 -- When a window was closed before Neovim restarted, the plugin can leave it closed while its terminal keeps running in hc.
@@ -92,15 +71,15 @@ T["keeps a closed window closed after Neovim restarts"] = function ()
     session.normal(child)
     child.type_keys(":close<CR>")
     session.wait(function ()
-        return not vim.inspect(child.lua_get(describe)):find('"' .. closed .. '"', 1, true)
+        return not vim.inspect(session.layout(child)):find('"' .. closed .. '"', 1, true)
             and not child.lua_get(holds, { closed })
     end, "layout without the closed window")
     -- When: Neovim exits and starts again
     child.stop()
     local restarted = session.editor()
-    session.wait(function () return #restarted.lua_get(describe) == 1 end, "restored layout")
+    session.wait(function () return #session.layout(restarted) == 1 end, "restored layout")
     -- Then: the closed window stays closed and its shell still runs
-    eq(vim.inspect(restarted.lua_get(describe)):find('"' .. closed .. '"', 1, true), nil)
+    eq(vim.inspect(session.layout(restarted)):find('"' .. closed .. '"', 1, true), nil)
     eq(session.hc({ "get", "--json", closed }).state, "live")
 end
 
@@ -117,7 +96,7 @@ T["restores the layout when Neovim starts with a file"] = function ()
     -- When: Neovim starts with a file
     local restarted = session.editor(file)
     -- Then: the agent's window comes back and the file's window stays
-    session.wait(function () return vim.deep_equal(restarted.lua_get(describe), { first }) end, "restored layout")
+    session.wait(function () return vim.deep_equal(session.layout(restarted), { first }) end, "restored layout")
     eq(
         restarted.lua_get(
             [[(function (path)

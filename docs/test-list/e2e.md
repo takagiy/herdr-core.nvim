@@ -63,19 +63,19 @@ Neovim, the plugin, hc, the Node.js dummy agent, the shell and the notification 
 ## Several Neovims
 
 - Connect two Neovims to the same E2E hc environment.
-  - [ ] When one Neovim names or pins a terminal, the other Neovim's sidebar can show the change.
-  - [ ] When one Neovim adds a tab or split or closes a terminal window, the other Neovim can reach the same layout without bringing the closed window back.
-  - [ ] When a second Neovim starts with an empty screen, it can restore the saved layout without overwriting it.
-  - [ ] When one Neovim moves focus or collapses its sidebar, the other Neovim can keep its own focus and sidebar.
+  - [x] When one Neovim names or pins a terminal, the other Neovim's sidebar can show the change.
+  - [x] When one Neovim adds a tab or split or closes a terminal window, the other Neovim can reach the same layout without bringing the closed window back.
+  - [x] When a second Neovim starts with an empty screen, it can restore the saved layout without overwriting it.
+  - [x] When one Neovim moves focus or collapses its sidebar, the other Neovim can keep its own focus and sidebar.
 
 ## Status, unread and notifications
 
 - Send real status reports from the dummy agent.
-  - [ ] When the dummy agent reports `working`, `blocked` and `done` with OSC 7501, hc and the sidebar can show each status.
-  - [ ] When a terminal nobody looks at becomes blocked or done, the plugin can run the OS notification command successfully, and on Linux dunst can log it.
-  - [ ] When a terminal shown in the focused Neovim becomes blocked or done, the plugin can update the sidebar without a notification.
-  - [ ] When the user opens a done terminal in the focused Neovim, both Neovims can show it as read through `herdr.seen`.
-  - [ ] When the user presses `u` on a read done terminal, the plugin can mark it unread in its label and the sidebar.
+  - [x] When the dummy agent reports `working`, `blocked` and `done` with OSC 7501, hc and the sidebar can show each status.
+  - [x] When a terminal nobody looks at becomes blocked or done, the plugin can run the OS notification command successfully, and on Linux dunst can log it.
+  - [x] When a terminal shown in the focused Neovim becomes blocked or done, the plugin can update the sidebar without a notification.
+  - [x] When the user opens a done terminal in the focused Neovim, both Neovims can show it as read through `herdr.seen`.
+  - [x] When the user presses `u` on a read done terminal, the plugin can mark it unread in its label and the sidebar.
 
 ## CI and failure records
 

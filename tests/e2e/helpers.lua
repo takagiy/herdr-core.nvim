@@ -2,6 +2,27 @@ local MiniTest = require("mini.test")
 local M = {}
 local project = vim.fn.getcwd()
 
+-- Each tab's window tree, with terminal windows by address and other windows left out.
+local describe = [[(function ()
+    local function node(tree)
+        if tree[1] == "leaf" then return vim.b[vim.api.nvim_win_get_buf(tree[2])].herdr_core_address end
+        local children = {}
+        for _, child in ipairs(tree[2]) do
+            local described = node(child)
+            if described then children[#children + 1] = described end
+        end
+        if #children == 0 then return nil end
+        if #children == 1 then return children[1] end
+        return { tree[1], children }
+    end
+    local tabs = {}
+    for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
+        local described = node(vim.fn.winlayout(vim.api.nvim_tabpage_get_number(tab)))
+        if described then tabs[#tabs + 1] = described end
+    end
+    return tabs
+end)()]]
+
 ---@param predicate   fun(): boolean
 ---@param description string
 function M.wait(predicate, description)
@@ -87,6 +108,25 @@ function M.new()
             "plugin startup"
         )
         return child
+    end
+    ---@param child MiniTest.child
+    ---@return string
+    function session.sidebar(child)
+        return child.lua_get(
+            [[(function ()
+            for _, buffer in ipairs(vim.api.nvim_list_bufs()) do
+                if vim.b[buffer].herdr_core_sidebar then
+                    return table.concat(vim.api.nvim_buf_get_lines(buffer, 0, -1, false), "\n")
+                end
+            end
+            return ""
+        end)()]]
+        )
+    end
+    ---@param child MiniTest.child
+    ---@return table
+    function session.layout(child)
+        return child.lua_get(describe)
     end
     ---@param child MiniTest.child
     function session.normal(child)
