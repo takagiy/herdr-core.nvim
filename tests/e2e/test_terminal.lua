@@ -52,9 +52,9 @@ T["reattaches to the same agent in a new Neovim"] = function ()
     session.wait(function () return session.text(child):find("reply:before-restart", 1, true) ~= nil end, "first reply")
     child.stop()
     -- When: a new Neovim starts the plugin and the user types into the restored terminal window
-    child = session.editor()
+    local restarted = session.editor()
     session.wait(function ()
-        return child.lua_get(
+        return restarted.lua_get(
             [[(function (address)
             for _, window in ipairs(vim.api.nvim_list_wins()) do
                 if vim.b[vim.api.nvim_win_get_buf(window)].herdr_core_address == address then
@@ -66,9 +66,11 @@ T["reattaches to the same agent in a new Neovim"] = function ()
         end)(...)]], { address }
         )
     end, "restored terminal window")
-    session.input(child, "echo after-restart")
+    session.input(restarted, "echo after-restart")
     -- Then: the same agent answers in the new Neovim
-    session.wait(function () return session.text(child):find("reply:after-restart", 1, true) ~= nil end, "second reply")
+    session.wait(
+        function () return session.text(restarted):find("reply:after-restart", 1, true) ~= nil end, "second reply"
+    )
     MiniTest.expect.equality(session.hc({ "get", "--json", address }).state, "live")
 end
 
