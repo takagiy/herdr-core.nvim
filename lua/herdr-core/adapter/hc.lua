@@ -137,7 +137,7 @@ local function listed(value)
     assert(type(value.terminals) == "table" and vim.islist(value.terminals), "Invalid hc terminal list")
     local items = {}
     for _, record in ipairs(value.terminals) do
-        items[#items + 1] = terminal(record)
+        if record.state ~= "finished" then items[#items + 1] = terminal(record) end
     end
     return { type = "terminals_listed", terminals = items }
 end
@@ -328,7 +328,10 @@ local function fact(message)
     end
     if event.type == "labels" then
         assert(type(data) == "table" and type(data.labels) == "table", "Invalid hc labels")
-        if data.record then return {type = "terminal_started", terminal = terminal(data.record)} end
+        if data.record then
+            if data.record.state == "finished" then return { type = "terminal_ended", terminal = event.terminal } end
+            return { type = "terminal_started", terminal = terminal(data.record) }
+        end
         for key, value in pairs(data.labels) do
             assert(type(key) == "string" and type(value) == "string", "Invalid hc label")
         end

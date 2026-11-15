@@ -17,3 +17,18 @@ The sidebar window.
 - [x] When the user clicks `»`, the sidebar can expand again.
 - [x] When the user sets other sidebar keys, the sidebar can use them in place of the defaults.
 - [x] When the user clicks the same place again quickly, the sidebar can treat the second click like the first.
+
+- [x] j/k と上下キーは、2行のターミナルを1項目として移動する。
+- [x] 状態色は記号だけに使い、名前は通常色の太字、プログラムは薄い色で表示する。
+- [x] 折りたたみボタンは « だけを表示する。
+
+- [x] 現在操作しているターミナルの2行全幅に背景を付け、サイドバーへの移動中も保持する。
+- [x] ヘッダーとプロジェクト見出しの太字、開閉記号、プロジェクト間の余白で階層を表示する。
+
+- [x] 別ウィンドウからの1回のクリックで、サイドバーの項目を操作する。
+- [x] サイドバーの外をクリックすると、標準のマウス操作でそのウィンドウに移動する。
+- [x] 既存のグローバルマウスマッピングを残したまま、項目の操作を1回だけ実行する。
+- [x] サイドバーを閉じると、マウス入力の監視を解除する。
+- [x] 開閉記号・待機件数・日本語を含む見出しでも、表示された + をクリックしてターミナルを起動する。
+
+- [x] 選択中のterminalが属するspaceの見出しを、通常と異なる全幅の背景色で表示する。

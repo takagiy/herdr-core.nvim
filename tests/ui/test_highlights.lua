@@ -22,4 +22,27 @@ T["preserves user highlight definitions"] = function ()
     vim.api.nvim_set_hl(0, "HerdrCoreWorking", {})
 end
 
+T["uses theme colors for active terminals and bold section headings"] = function ()
+    -- Given the default sidebar styles without user overrides
+    -- When the sidebar styles are initialized
+    require("herdr-core.ui.highlights").setup()
+    -- Then the active background follows CursorLine and headings use bold normal text
+    MiniTest.expect.equality(vim.api.nvim_get_hl(0, { name = "HerdrCoreActive" }).link, "CursorLine")
+    MiniTest.expect.equality(vim.api.nvim_get_hl(0, { name = "HerdrCoreHeader" }).bold, true)
+    MiniTest.expect.equality(vim.api.nvim_get_hl(0, { name = "HerdrCoreSpace" }).bold, true)
+end
+
+T["gives labels bold text and spaces distinct theme backgrounds"] = function ()
+    -- Given the editor's theme colors
+    -- When sidebar highlights are initialized
+    require("herdr-core.ui.highlights").setup()
+    -- Then labels are bold and space backgrounds differ when selected
+    MiniTest.expect.equality(vim.api.nvim_get_hl(0, { name = "HerdrCoreLabel" }).bold, true)
+    local space = vim.api.nvim_get_hl(0, { name = "HerdrCoreSpace", link = false })
+    local active = vim.api.nvim_get_hl(0, { name = "HerdrCoreSpaceActive", link = false })
+    MiniTest.expect.equality(type(space.bg), "number")
+    MiniTest.expect.equality(type(active.bg), "number")
+    MiniTest.expect.equality(space.bg ~= active.bg, true)
+end
+
 return T

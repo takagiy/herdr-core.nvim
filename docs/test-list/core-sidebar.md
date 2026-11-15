@@ -19,3 +19,5 @@ The rows the sidebar shows.
 - [x] When the sidebar is collapsed, it can show only the number of terminals waiting for the user.
 
 - [x] When a remote machine heading is folded, the sidebar can hide its projects without losing the total waiting count.
+
+- [x] プログラムはパスを除いた実行ファイル名を表示し、大小文字を問わず .exe を省く。

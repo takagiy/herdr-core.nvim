@@ -728,4 +728,61 @@ T["reports that the event stream closed"] = function ()
     MiniTest.expect.equality(closed, true)
 end
 
+T["omits finished terminals from list and event snapshots"] = function ()
+    -- Given an event snapshot containing a live terminal and a finished terminal
+    local snapshot = vim.json.encode({
+        seq = 1,
+        terminals = {
+            { address = "t1", state = "live", cwd = "/app", labels = {}, created_ms = 1 },
+            { address = "t4", state = "finished", cwd = "/app", labels = {}, created_ms = 1 }
+        }
+    })
+    fake_process(snapshot)
+    local addresses = {}
+    -- When the initial event snapshot is translated
+    local stop = require("herdr-core.adapter.hc").watch(function (event)
+        if event and event.type == "terminals_listed" then
+            local listed = event --[[@as HerdrCoreTerminalsListed]]
+            for _, record in ipairs(listed.terminals) do
+                addresses[#addresses + 1] = record.address
+            end
+        end
+    end)
+    stop()
+    -- Then only the live terminal can be chosen in the sidebar
+    MiniTest.expect.equality(addresses, { "t1" })
+end
+
+T["does not revive a finished terminal when its labels change"] = function ()
+    -- Given a label event carrying a finished terminal record
+    local feed = fake_stream()
+    local events = {}
+    local stop = require("herdr-core.adapter.hc").watch(function (event)
+        if event then events[#events + 1] = event end
+    end)
+    -- When another client changes its labels
+    feed(vim.json.encode({
+            method = "event",
+            params = {
+                seq = 1,
+                type = "labels",
+                terminal = "t4",
+                data = {
+                    labels = {},
+                    record = {
+                        address = "t4",
+                        state = "finished",
+                        cwd = "/app",
+                        labels = {},
+                        created_ms = 1
+                    }
+                }
+            }
+        })
+            .. string.char(10))
+    stop()
+    -- Then the terminal remains ended instead of being added again
+    MiniTest.expect.equality(events, { { type = "terminal_ended", terminal = "t4" } })
+end
+
 return T
