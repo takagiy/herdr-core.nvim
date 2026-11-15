@@ -2,5 +2,12 @@
 
 The core's single entry point.
 
-- [ ] When an event arrives, `update` can return the new state and the effects that every part asked for.
-- [ ] When an event's type is unknown, `update` can return the state unchanged with no effects.
+- [x] When a terminal starts, `update` can store it and request its repository root.
+- [x] When a terminal ends, `update` can remove it from terminals, spaces and layout and return the layout effects.
+- [x] When a foreground folder changes, `update` can store the foreground data and request the root on the terminal's machine.
+- [x] When the initial terminal list arrives, `update` can store it and request every terminal's repository root.
+- [x] When status, labels, turn, name or pin events arrive, `update` can return the terminal state and requested effects.
+- [x] When a repository root result arrives for the current folder, `update` can update its space.
+- [x] When a repository root result arrives for an old folder or ended terminal, `update` can ignore it.
+- [x] When layout events arrive, `update` can return the layout state and effects.
+- [x] When an event's type is unknown, `update` can return the state unchanged with no effects.

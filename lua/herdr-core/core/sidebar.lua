@@ -1,0 +1,134 @@
+local M = {}
+local attention = require("herdr-core.core.attention")
+
+---@class HerdrCoreSidebarRow
+---@field kind      'machine' | 'space' | 'terminal' | 'summary'
+---@field root      string?
+---@field address   string?
+---@field machine   string?
+---@field connected boolean?
+---@field status    string?
+---@field lines     string[]
+---@field waiting   integer?
+---@field id        string?
+
+---@class HerdrCoreSidebarGroup
+---@field root      string
+---@field machine   string?
+---@field terminals HerdrCoreTerminal[]
+---@field updated   integer
+
+---@class HerdrCoreSidebarOptions
+---@field machines?  table<string, boolean>
+---@field folded?    table<string, boolean>
+---@field collapsed? boolean
+
+---@class HerdrCoreSidebarState
+---@field groups    table<string, integer>
+---@field terminals table<string, integer>
+---@field locations table<string, string>
+
+---@param previous? HerdrCoreSidebarState
+---@param terminals HerdrCoreTerminal[]
+---@param options?  HerdrCoreSidebarOptions
+---@return HerdrCoreSidebarState, HerdrCoreSidebarRow[]
+function M.update(previous, terminals, options)
+    options = options or {}
+    ---@type table<string, HerdrCoreSidebarGroup>
+    local groups = {}
+    for _, terminal in ipairs(terminals) do
+        local root = terminal.labels["herdr.space"] or terminal.folder
+        local key = (terminal.machine or "") .. "\0" .. root
+        groups[key] = groups[key] or { root = root, machine = terminal.machine, terminals = {}, updated = 0 }
+        groups[key].updated = math.max(groups[key].updated, terminal.status_ms or terminal.created_ms)
+        table.insert(groups[key].terminals, terminal)
+    end
+    local roots = {}
+    for root in pairs(groups) do
+        table.insert(roots, root)
+    end
+    table.sort(roots, function (a, b)
+        local first, second = groups[a], groups[b]
+        if first.machine ~= second.machine then return (first.machine or "") < (second.machine or "") end
+        if previous then
+            local ap, bp = previous.groups[a] or 0, previous.groups[b] or 0
+            if ap ~= bp then return ap < bp end
+        end
+        if first.updated ~= second.updated then return first.updated > second.updated end
+        return a < b
+    end)
+    ---@type HerdrCoreSidebarRow[]
+    local rows = {}
+    ---@type HerdrCoreSidebarState
+    local state = { groups = {}, terminals = {}, locations = {} }
+    local machine = ""
+    local total_waiting = 0
+    local terminal_index = 0
+    for group_index, root in ipairs(roots) do
+        state.groups[root] = group_index
+        local group = groups[root]
+        table.sort(group.terminals, function (a, b)
+            local ap = a.labels["herdr.pinned"] ~= nil and a.labels["herdr.pinned"] ~= ""
+            local bp = b.labels["herdr.pinned"] ~= nil and b.labels["herdr.pinned"] ~= ""
+            if ap ~= bp then return ap end
+            if previous then
+                local first = previous.locations[a.address] == root and previous.terminals[a.address] or 0
+                local second = previous.locations[b.address] == root and previous.terminals[b.address] or 0
+                if first ~= second then return first < second end
+            end
+            local first, second = a.status_ms or a.created_ms, b.status_ms or b.created_ms
+            if first ~= second then return first > second end
+            return a.address < b.address
+        end)
+        if group.machine and group.machine ~= machine then
+            table.insert(rows, {
+                kind = "machine",
+                id = "machine:" .. group.machine,
+                lines = {},
+                machine = group.machine,
+                connected = not options.machines or options.machines[group.machine] ~= false
+            })
+            machine = group.machine
+        end
+        local waiting = 0
+        for _, terminal in ipairs(group.terminals) do
+            if attention.display(terminal).waiting then waiting = waiting + 1 end
+        end
+        total_waiting = total_waiting + waiting
+        local machine_folded = group.machine and options.folded and options.folded["machine:" .. group.machine]
+        if not machine_folded then
+            table.insert(rows, {
+                kind = "space",
+                id = root,
+                root = group.root,
+                machine = group.machine,
+                lines = {},
+                waiting = waiting
+            })
+        end
+        for _, terminal in ipairs(group.terminals) do
+            terminal_index = terminal_index + 1
+            state.terminals[terminal.address] = terminal_index
+            state.locations[terminal.address] = root
+            if not machine_folded and (not options.folded or not options.folded[root]) then
+                table.insert(rows, {
+                    kind = "terminal",
+                    address = terminal.address,
+                    status = attention
+                        .display(terminal)
+                        .status,
+                    lines = {
+                        terminal.labels["herdr-core-nvim.name"] or terminal.name or terminal.address,
+                        terminal.program or ""
+                    }
+                })
+            end
+        end
+    end
+    if options.collapsed then
+        return state, { { kind = "summary", lines = {}, waiting = total_waiting } }
+    end
+    return state, rows
+end
+
+return M

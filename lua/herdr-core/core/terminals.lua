@@ -2,6 +2,7 @@ local M = {}
 
 ---@class HerdrCoreTerminal
 ---@field address    string
+---@field machine    string?
 ---@field name       string?
 ---@field labels     table<string, string>
 ---@field status     string?
@@ -31,7 +32,7 @@ local M = {}
 ---@field type     'foreground_changed'
 ---@field terminal string
 ---@field program  string?
----@field folder   string
+---@field folder   string?
 
 ---@class HerdrCoreLabelsChanged
 ---@field type     'labels_changed'
@@ -102,6 +103,7 @@ function M.update(state, event)
         if current then
             local terminal = {
                 address = current.address,
+                machine = current.machine,
                 name = current.name,
                 labels = current.labels,
                 status = current.status,
@@ -113,7 +115,7 @@ function M.update(state, event)
             }
             if event.type == "foreground_changed" then
                 terminal.program = event.program
-                terminal.folder = event.folder
+                terminal.folder = event.folder or current.folder
             elseif event.type == "status_changed" then
                 terminal.status = event.status
                 terminal.status_ms = event.status_ms

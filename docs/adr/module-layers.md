@@ -34,7 +34,7 @@
 | | `attention.lua` | done と未読の判定、`herdr.seen` を書くか、通知するか |
 | | `sidebar.lua` | サイドバーの行の一覧（木、並び順、ピン留め、待っている数、折りたたみ） |
 | | `open.lua` | 開き方。差し替えられる形にする |
-| adapter | `hc.lua` | `hc` の呼び出し（run、ls、label、doc.get / doc.set）と `hc events` の受信 |
+| adapter | `hc.lua` | `hc` の呼び出し（run、ls、label、attach）、`hc events` の受信、`hc connect` 経由の doc.get / doc.set |
 | | `git.lua` | パスから repo root を求める |
 | | `notifier.lua` | OS の通知。利用者が差し替えられる |
 | ui | `terminal.lua` | `herdr://` のバッファーと `hc attach`、`BufReadCmd`、自動のターミナルモード |
