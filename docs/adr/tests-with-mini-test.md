@@ -8,7 +8,7 @@
 - adapter: 偽の `hc` を相手に、呼び出しと変換を確かめる。
 - ui: ヘッドレスの Neovim で、ターミナルのバッファー、キー入力、マウスのクリック、サイドバーの描画を確かめる。
 
-開発は Windows で行い、CI は Linux と macOS でも動かす。
+開発は Windows で行う。E2E の実行環境と CI は [実際の hc を通す E2E の決定](e2e-with-real-hc.md) に従う。
 
 ## 決定
 
