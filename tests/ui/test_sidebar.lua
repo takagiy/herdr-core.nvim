@@ -328,6 +328,31 @@ T["uses the keys the user sets in place of the defaults"] = function ()
     MiniTest.expect.equality(defaults, { false, false, false, false, false })
 end
 
+T["lets user action keys override item navigation"] = function ()
+    -- Given action keys that overlap with default navigation keys
+    local reported = {}
+    local sidebar = require("herdr-core.ui.sidebar").create(function (action, row)
+        reported[#reported + 1] = { action, row and row.address }
+    end, { activate = "j", new_terminal = "<Down>", pin = "k", unread = "<Up>" })
+    local window = sidebar.show()
+    sidebar.render({ { kind = "terminal", address = "t1", lines = { "review", "claude" } } }, 0)
+    vim.api.nvim_set_current_win(window)
+    vim.api.nvim_win_set_cursor(window, { 2, 0 })
+    -- When the configured keys are pressed through their actual mappings
+    vim.cmd("normal j")
+    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Down>k<Up>", true, false, true), "xt", false)
+    local line = vim.api.nvim_win_get_cursor(window)[1]
+    sidebar.close()
+    -- Then each key performs its configured action without moving the cursor
+    MiniTest.expect.equality(reported, {
+        { "activate", "t1" },
+        { "new_terminal", "t1" },
+        { "pin", "t1" },
+        { "unread", "t1" }
+    })
+    MiniTest.expect.equality(line, 2)
+end
+
 -- When a new tabpage is opened from the sidebar window, the sidebar can appear in it beside the new window.
 T["appears in a tab opened from the sidebar window"] = function ()
     -- Given the cursor in a shown sidebar

@@ -59,6 +59,23 @@ function M.create(on_action, keys)
         local action = column and plus[line] == column and "new_terminal" or "activate"
         if on_action then on_action(action, by_line[line]) end
     end
+    ---@param direction integer
+    local function move(direction)
+        if #positions == 0 then return end
+        local line = vim.api.nvim_win_get_cursor(0)[1]
+        local index = 0
+        for item, start in ipairs(positions) do
+            if start <= line then index = item end
+        end
+        index = math.max(1, math.min(#positions, index + direction * vim.v.count1))
+        vim.api.nvim_win_set_cursor(0, { assert(positions[index]), 0 })
+    end
+    for _, key in ipairs({ "j", "<Down>" }) do
+        vim.keymap.set("n", key, function () move(1) end, { buffer = buffer })
+    end
+    for _, key in ipairs({ "k", "<Up>" }) do
+        vim.keymap.set("n", key, function () move(-1) end, { buffer = buffer })
+    end
     vim.keymap.set(
         "n", bound.activate, function () activate(assert(vim.api.nvim_win_get_cursor(0)[1])) end, { buffer = buffer }
     )
@@ -95,23 +112,6 @@ function M.create(on_action, keys)
             if row and row.kind == "terminal" and on_action then on_action(action, row) end
         end, { buffer = buffer }
         )
-    end
-    ---@param direction integer
-    local function move(direction)
-        if #positions == 0 then return end
-        local line = vim.api.nvim_win_get_cursor(0)[1]
-        local index = 0
-        for item, start in ipairs(positions) do
-            if start <= line then index = item end
-        end
-        index = math.max(1, math.min(#positions, index + direction * vim.v.count1))
-        vim.api.nvim_win_set_cursor(0, { assert(positions[index]), 0 })
-    end
-    for _, key in ipairs({ "j", "<Down>" }) do
-        vim.keymap.set("n", key, function () move(1) end, { buffer = buffer })
-    end
-    for _, key in ipairs({ "k", "<Up>" }) do
-        vim.keymap.set("n", key, function () move(-1) end, { buffer = buffer })
     end
     ---@param requested? integer
     ---@return integer
