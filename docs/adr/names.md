@@ -12,6 +12,8 @@ GitHub で公開し、lazy.nvim などで入れられるようにする。herdr 
 | Lua モジュール | `require("herdr-core")` |
 | ターミナルのバッファー | `herdr://<名前>`。名前がなければアドレス（`herdr://t1`）、ほかのマシンは `herdr://vps/t7` |
 | ハイライトと autocmd のグループ | `HerdrCore` で始める（例: `HerdrCoreWorking`） |
+| hc の doc | `herdr-core-nvim`。doc の名前はターミナル名と同じ規則（小文字の英字、数字、`-`、`_` で 1〜32 文字）で、`.` を使えない |
+| 自分用の label | `herdr-core-nvim.` で始める（例: `herdr-core-nvim.name`）。Herdr のクライアントで共有する `herdr.` とは分ける |
 | hc の API をそのまま呼ぶコマンド | 作る場合は `:Hc <サブコマンド>`。作るかは未定 |
 
 ## 結果
