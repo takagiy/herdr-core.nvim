@@ -170,26 +170,46 @@ function M.new()
         child.type_keys(tostring(row) .. "G<CR>")
         M.wait(function () return child.lua_get("vim.b.herdr_core_address") == address end, "open " .. address)
     end
-    function session.close()
-        if closed then return end
-        closed = true
-        local artifacts = vim.env.HERDR_E2E_ARTIFACTS or (project .. "/artifacts/e2e")
-        vim.fn.mkdir(artifacts, "p")
+    -- Records of a failed case, for finding out why: its name, each Neovim's screen and messages, and hc's state and logs.
+    ---@param folder string
+    local function record(folder)
+        vim.fn.mkdir(folder, "p")
+        local case = MiniTest.current.case
+        vim.fn.writefile({ case and table.concat(case.desc, " | ") or "unknown case" }, folder .. "/case.txt")
         for index, child in ipairs(children) do
             if child.is_running() then
-                local ok, snapshot = pcall(
-                    child.lua_get,
-                    [[{ messages = vim.fn.execute('messages'),
-                    buffers = vim.tbl_map(function(b) return {name=vim.api.nvim_buf_get_name(b),
-                    lines=vim.api.nvim_buf_get_lines(b,0,-1,false)} end, vim.api.nvim_list_bufs()) }]]
-                )
-                if ok then
+                pcall(function ()
                     vim.fn.writefile(
-                        vim.split(vim.inspect(snapshot), "\n"),
-                        artifacts .. "/" .. env.HC_SESSION .. "-" .. index .. ".log"
+                        vim.split(tostring(child.get_screenshot()), "\n"), folder .. "/screen-" .. index .. ".txt"
                     )
-                end
+                    vim.fn.writefile(
+                        vim.split(child.lua_get("vim.fn.execute('messages')"), "\n"),
+                        folder .. "/messages-" .. index .. ".txt"
+                    )
+                end)
             end
+        end
+        pcall(function ()
+            vim.fn.writefile({ vim.json.encode(session.hc({ "ls", "--json", "--all" })) }, folder .. "/hc.json")
+        end)
+        local state = env.XDG_STATE_HOME .. "/herdr-core/" .. env.HC_SESSION
+        for _, name in ipairs({ "core.log", "holder.log", "terminals.json" }) do
+            if vim.fn.filereadable(state .. "/" .. name) == 1 then
+                vim.fn.writefile(vim.fn.readfile(state .. "/" .. name, "b"), folder .. "/" .. name, "b")
+            end
+        end
+    end
+    ---@param options? { failed: boolean? }
+    function session.close(options)
+        if closed then return end
+        closed = true
+        local case = MiniTest.current.case
+        ---@type { fails: string[]? }
+        local exec = case and rawget(case, "exec") or {}
+        local failed = options and options.failed or #(exec.fails or {}) > 0
+        if failed then
+            local artifacts = vim.env.HERDR_E2E_ARTIFACTS or (project .. "/artifacts/e2e")
+            record(artifacts .. "/" .. env.HC_SESSION)
         end
         for _, child in ipairs(children) do
             pcall(child.stop)

@@ -43,6 +43,37 @@ T["collects only E2E cases and fails when there are none"] = function ()
     MiniTest.expect.equality((result.stdout .. result.stderr):find("No E2E cases collected", 1, true) ~= nil, true)
 end
 
+-- When a case fails or times out in CI, the run can keep the case name, screen, messages and hc state and logs as an artifact and still clean up.
+T["keeps the records of a failing case and still cleans up"] = function ()
+    -- Given: a session with an agent and a Neovim that printed a message, writing records to a fresh folder
+    local H = dofile("tests/e2e/helpers.lua")
+    local artifacts = vim.fn.tempname()
+    local saved = vim.env.HERDR_E2E_ARTIFACTS
+    vim.env.HERDR_E2E_ARTIFACTS = artifacts
+    local session = H.new()
+    local address = session.spawn()
+    local child = session.editor()
+    child.cmd("echomsg 'probe-message'")
+    -- When: the session closes after a failure
+    session.close({ failed = true })
+    vim.env.HERDR_E2E_ARTIFACTS = saved
+    -- Then: one folder holds the case name, screen, messages, hc state and logs, and no process is left
+    local folders = vim.fn.glob(artifacts .. "/*", true, true)
+    MiniTest.expect.equality(#folders, 1)
+    local folder = assert(folders[1])
+    ---@param name string
+    ---@return string
+    local function read(name)
+        return table.concat(vim.fn.readfile(folder .. "/" .. name), "\n")
+    end
+    MiniTest.expect.equality(read("case.txt"):find("keeps the records of a failing case", 1, true) ~= nil, true)
+    MiniTest.expect.equality(#read("screen-1.txt") > 0, true)
+    MiniTest.expect.equality(read("messages-1.txt"):find("probe-message", 1, true) ~= nil, true)
+    MiniTest.expect.equality(read("hc.json"):find(address, 1, true) ~= nil, true)
+    MiniTest.expect.equality(vim.fn.filereadable(folder .. "/core.log"), 1)
+    MiniTest.expect.equality(child.is_running(), false)
+end
+
 -- When E2E runs next to another hc session, it can leave that session's terminals, settings and saved layout unchanged.
 T["isolates terminal labels and configuration from another core"] = function ()
     -- Given: another dedicated core with its own terminal and configuration
