@@ -237,4 +237,90 @@ T["asks to focus a chosen terminal's window or to show it"] = function ()
     MiniTest.expect.equality(policy, { { type = "show_terminal", terminal = "t2", placement = "vertical" } })
 end
 
+-- When the user activates a heading, `update` can fold or unfold it.
+T["folds a heading and unfolds it again"] = function ()
+    -- Given a space heading
+    local core = require("herdr-core.core.state")
+    local state = core.new()
+    -- When it is activated twice
+    local folded = core.update(state, { type = "heading_toggled", id = "/app" })
+    local unfolded = core.update(folded, { type = "heading_toggled", id = "/app" })
+    -- Then it is folded after the first and unfolded after the second
+    MiniTest.expect.equality(folded.folded["/app"], true)
+    MiniTest.expect.equality(unfolded.folded["/app"], nil)
+end
+
+-- When the user asks for a new terminal, `update` can ask for a shell where the opening policy decides.
+T["asks for a shell in the folder the request came from"] = function ()
+    -- Given a request from a terminal window in /app/src, under the space /app
+    local core = require("herdr-core.core.state")
+    local request = {
+        type = "new_terminal_requested",
+        placement = "vertical",
+        tab = "tab-9",
+        terminal_folder = "/app/src",
+        editor_folder = "/home"
+    }
+    -- When it is made from the terminal window, and again from the space heading
+    local _, from_window = core.update(core.new(), request)
+    local from_space = vim.tbl_extend("force", request, { space_root = "/app" }) --[[@as HerdrCoreNewTerminalRequested]]
+    local _, from_heading = core.update(core.new(), from_space)
+    -- Then the shell starts in the terminal's folder, or in the space root for the heading
+    MiniTest.expect.equality(from_window, {
+        {
+            type = "run_shell",
+            folder = "/app/src",
+            placement = "vertical",
+            labels = { ["herdr.tab"] = "tab-9", ["herdr.seen"] = "0" }
+        }
+    })
+    MiniTest.expect.equality(assert(from_heading[1]).folder, "/app")
+end
+
+-- When the user marks a terminal unread, `update` can ask to lower its `herdr.seen` label.
+T["asks to lower herdr.seen when a terminal is marked unread"] = function ()
+    -- Given a terminal seen up to its turn 4
+    local core = require("herdr-core.core.state")
+    local state = core.new()
+    state.terminals.t1 = terminal("t1", { turn = 4, labels = { ["herdr.seen"] = "4" } })
+    -- When the user marks it unread
+    local _, effects = core.update(state, { type = "unread_requested", terminal = "t1" })
+    -- Then its herdr.seen label is lowered below its turn
+    MiniTest.expect.equality(effects, { { type = "set_label", terminal = "t1", key = "herdr.seen", value = "3" } })
+end
+
+-- When the state changes, `view` can return the sidebar rows and the number of terminals waiting, keeping their order.
+T["returns the sidebar rows and the waiting count in a stable order"] = function ()
+    -- Given a blocked terminal in /app and an older idle one in /docs, with /docs folded
+    local core = require("herdr-core.core.state")
+    local state = core.new()
+    state.terminals.t1 = terminal("t1", { status = "blocked", status_ms = 20, labels = { ["herdr.space"] = "/app" } })
+    state.terminals.t2 = terminal("t2", {
+        folder = "/docs",
+        status = "idle",
+        status_ms = 10,
+        labels = {
+            ["herdr.space"] = "/docs"
+        }
+    })
+    state = core.update(state, { type = "heading_toggled", id = string.char(0) .. "/docs" })
+    -- When the view is taken, and taken again after /docs becomes the newest
+    local next_state, rows, waiting = core.view(state)
+    next_state.terminals.t2 = vim.tbl_extend("force", next_state.terminals.t2, { status_ms = 30 })
+    local _, again = core.view(next_state)
+    -- Then /app with its terminal comes first, /docs shows only its heading, one terminal waits, and the order holds
+    ---@param list HerdrCoreSidebarRow[]
+    ---@return string[]
+    local function describe(list)
+        local described = {}
+        for _, row in ipairs(list) do
+            described[#described + 1] = row.kind .. ":" .. (row.address or row.root)
+        end
+        return described
+    end
+    MiniTest.expect.equality(describe(rows), { "space:/app", "terminal:t1", "space:/docs" })
+    MiniTest.expect.equality(waiting, 1)
+    MiniTest.expect.equality(describe(again), describe(rows))
+end
+
 return T

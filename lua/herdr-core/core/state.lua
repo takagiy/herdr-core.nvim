@@ -3,6 +3,7 @@ local spaces = require("herdr-core.core.spaces")
 local layout = require("herdr-core.core.layout")
 local attention = require("herdr-core.core.attention")
 local open = require("herdr-core.core.open")
+local sidebar = require("herdr-core.core.sidebar")
 local M = {}
 
 ---@class HerdrCoreState
@@ -13,6 +14,24 @@ local M = {}
 ---@field shown     string[]
 ---@field read      table<string, integer>
 ---@field open?     fun(terminal: string): HerdrCoreOpenEffect
+---@field folded    table<string, true>
+---@field sidebar?  HerdrCoreSidebarState
+
+---@class HerdrCoreHeadingToggled
+---@field type 'heading_toggled'
+---@field id   string
+
+---@class HerdrCoreNewTerminalRequested
+---@field type             'new_terminal_requested'
+---@field placement        'tab' | 'vertical' | 'horizontal'
+---@field tab              string
+---@field space_root?      string
+---@field terminal_folder? string
+---@field editor_folder    string
+
+---@class HerdrCoreUnreadRequested
+---@field type     'unread_requested'
+---@field terminal string
 
 ---@class HerdrCoreStateOptions
 ---@field open? fun(terminal: string): HerdrCoreOpenEffect
@@ -22,7 +41,7 @@ local M = {}
 ---@field terminal string
 ---@field windows  table<string, string>
 
----@alias HerdrCoreEvent HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict
+---@alias HerdrCoreEvent HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreHeadingToggled | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict
 ---@alias HerdrCoreEffect HerdrCoreSetLabel | HerdrCoreSpaceEffect | HerdrCoreLayoutEffect | HerdrCoreOpenEffect | HerdrCoreNotify | HerdrCoreRunShell
 
 ---@class HerdrCoreUnknownEvent
@@ -43,6 +62,7 @@ function M.new(options)
         focused = true,
         shown = {},
         read = {},
+        folded = {},
         open = options and options.open
     }
 end
@@ -55,9 +75,27 @@ local function with(state, changes)
 end
 
 ---@param state HerdrCoreState
----@param event HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict | HerdrCoreUnknownEvent
+---@param event HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreHeadingToggled | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict | HerdrCoreUnknownEvent
 ---@return HerdrCoreState, HerdrCoreEffect[]
 function M.update(state, event)
+    if event.type == "unread_requested" then
+        ---@type HerdrCoreTerminal?
+        local terminal = state.terminals[event.terminal]
+        return state, terminal and attention.unread(terminal) or {}
+    end
+    if event.type == "new_terminal_requested" then
+        local context = {
+            space_root = event.space_root,
+            terminal_folder = event.terminal_folder,
+            editor_folder = event.editor_folder
+        }
+        return state, { open.new_terminal(context, event.placement, event.tab) }
+    end
+    if event.type == "heading_toggled" then
+        local folded = vim.deepcopy(state.folded)
+        folded[event.id] = not folded[event.id] or nil
+        return with(state, { folded = folded }), {}
+    end
     if event.type == "terminal_chosen" then
         return state, { open.choose(event.terminal, event.windows, state.open) }
     end
@@ -159,6 +197,18 @@ function M.update(state, event)
         return with(state, { terminals = updated, spaces = next_spaces, layout = state.layout }), effects
     end
     return state, {}
+end
+
+---@param state HerdrCoreState
+---@return HerdrCoreState, HerdrCoreSidebarRow[], integer
+function M.view(state)
+    local list = vim.tbl_values(state.terminals)
+    local order, rows = sidebar.update(state.sidebar, list, { folded = state.folded })
+    local waiting = 0
+    for _, row in ipairs(rows) do
+        if row.kind == "space" then waiting = waiting + (row.waiting or 0) end
+    end
+    return with(state, { sidebar = order }), rows, waiting
 end
 
 return M
