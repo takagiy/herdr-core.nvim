@@ -8,7 +8,7 @@ Neovim, the plugin, hc, the Node.js dummy agent, the shell and the notification 
 
 - Ordinary tests and E2E run separately.
   - [x] When hc is not on the PATH, `mise run test` can run only the ordinary tests.
-  - [ ] When `mise run test-e2e` runs, it can run only the E2E cases and fail when none are collected.
+  - [x] When `mise run test-e2e` runs, it can run only the E2E cases and fail when none are collected.
   - [x] When Neovim, hc or Node.js is missing, E2E can fail with the missing executable instead of skipping.
 
 - E2E runs in its own environment and cleans up after success and failure.
@@ -19,15 +19,15 @@ Neovim, the plugin, hc, the Node.js dummy agent, the shell and the notification 
 
 - Talk to the dummy agent and keep using it after its window closes.
   - [x] When the user types into a dummy agent opened from the sidebar, Neovim can show the agent's reply through a real attach.
-  - [ ] When the terminal buffer is wiped and the agent is opened again from the sidebar, the plugin can reattach to the same agent.
-  - [ ] When Neovim exits and a new Neovim starts the plugin, the plugin can reattach to the same agent.
-  - [ ] When the dummy agent exits, the plugin can close only the windows that showed it.
+  - [x] When the terminal buffer is wiped and the agent is opened again from the sidebar, the plugin can reattach to the same agent.
+  - [x] When Neovim exits and a new Neovim starts the plugin, the plugin can reattach to the same agent.
+  - [x] When the dummy agent exits, the plugin can close only the windows that showed it.
 
 - Start real shells from the plugin.
-  - [ ] When the user presses the keys for a new terminal in a tab, a vertical split and a horizontal split, the plugin can open a working shell in each place.
-  - [ ] When a new shell is opened from a terminal window, it can start in that terminal's current folder, including folders with spaces and Japanese names.
-  - [ ] When a new shell is opened from a file window, it can start in Neovim's current folder.
-  - [ ] When a new shell is opened from a space heading with `n` or a click on `+`, it can start in that space's folder.
+  - [x] When the user presses the keys for a new terminal in a tab, a vertical split and a horizontal split, the plugin can open a working shell in each place.
+  - [x] When a new shell is opened from a terminal window, it can start in that terminal's current folder, including folders with spaces and Japanese names.
+  - [x] When a new shell is opened from a file window, it can start in Neovim's current folder.
+  - [x] When a new shell is opened from a space heading with `n` or a click on `+`, it can start in that space's folder.
 
 ## Sidebar
 

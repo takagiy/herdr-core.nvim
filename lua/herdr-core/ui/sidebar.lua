@@ -128,7 +128,7 @@ function M.create(on_action, keys)
         for _, row in ipairs(collapsed and {} or rows) do
             local start = #lines + 1
             if row.kind == "space" then
-                lines[#lines + 1] = (row.root or "") .. "  [" .. (row.waiting or 0) .. "]  +"
+                lines[#lines + 1] = vim.fs.basename(row.root or "") .. "  [" .. (row.waiting or 0) .. "]  +"
                 plus[#lines] = vim.fn.strdisplaywidth(lines[#lines])
                 marks[#marks + 1] = { #lines - 1, "HerdrCoreSpace" }
             elseif row.kind == "machine" then

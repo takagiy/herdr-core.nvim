@@ -30,6 +30,19 @@ T["runs ordinary tests without hc and excludes E2E"] = function ()
     MiniTest.expect.equality((result.stdout .. result.stderr):find("test_environment.lua", 1, true), nil)
 end
 
+-- When `mise run test-e2e` runs, it can run only the E2E cases and fail when none are collected.
+T["collects only E2E cases and fails when there are none"] = function ()
+    -- Given: a tree where only an ordinary test file can be found
+    local env = vim.fn.environ()
+    env.HERDR_TEST_GROUP = "e2e"
+    local only_ordinary = "lua vim.fn.globpath = function () return { 'tests/core/test_state.lua' } end"
+    -- When: the E2E runner is launched
+    local result = run(env, { "--cmd", only_ordinary })
+    -- Then: the ordinary file is left out, and finding no E2E case is a failure
+    MiniTest.expect.equality(result.code ~= 0, true)
+    MiniTest.expect.equality((result.stdout .. result.stderr):find("No E2E cases collected", 1, true) ~= nil, true)
+end
+
 -- When E2E runs next to another hc session, it can leave that session's terminals, settings and saved layout unchanged.
 T["isolates terminal labels and configuration from another core"] = function ()
     -- Given: another dedicated core with its own terminal and configuration

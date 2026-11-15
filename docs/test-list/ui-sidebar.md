@@ -3,6 +3,7 @@
 The sidebar window.
 
 - [x] When given rows, the sidebar can draw headings, two-line terminal rows and counts with `HerdrCore` highlights.
+- [x] When a space heading is drawn, the sidebar can show the folder's name instead of its full path, so that `+` stays in view.
 - [x] When the user switches tabpages, the sidebar can stay on the same side and width.
 - [x] When a new tabpage is opened from the sidebar window, the sidebar can appear in it beside the new window.
 - [x] When the user presses Enter or clicks on a terminal row, the sidebar can report that terminal as chosen.

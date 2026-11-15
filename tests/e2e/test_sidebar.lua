@@ -174,11 +174,11 @@ activation["collapses and expands a heading while its terminals stay running"] =
     local child = session.editor()
     session.row(child, "agent")
     -- When: the user folds and unfolds the space heading
-    activate(child, vim.fs.normalize(session.root), method)
+    activate(child, vim.fs.basename(session.root), method)
     -- Then: its terminal row disappears without stopping the program, and returns on expansion
     session.wait(function () return not session.text(child):find("agent", 1, true) end, "terminal row hidden")
     eq(session.hc({ "get", "--json", address }).state, "live")
-    activate(child, vim.fs.normalize(session.root), method)
+    activate(child, vim.fs.basename(session.root), method)
     session.row(child, "agent")
     session.choose(child, address)
     reply(child, "after-heading-fold")

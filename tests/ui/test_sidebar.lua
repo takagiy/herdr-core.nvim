@@ -21,7 +21,7 @@ T["draws headings counts and two-line terminals with highlights"] = function ()
     sidebar.close()
     -- Then the terminal name and program occupy separate lines
     MiniTest.expect.equality(
-        { lines[1], lines[2], lines[3], lines[4] }, { "Waiting: 2", "/app  [2]  +", "  ◐ build", "    claude" }
+        { lines[1], lines[2], lines[3], lines[4] }, { "Waiting: 2", "app  [2]  +", "  ◐ build", "    claude" }
     )
     MiniTest.expect.equality(#marks > 0, true)
     MiniTest.expect.equality(lines[#lines], "« Collapse")
@@ -109,7 +109,7 @@ T["reports new terminal requests from n and the heading plus button"] = function
     local keyboard = vim.fn.maparg("n", "n", false, true).callback
     if keyboard then keyboard() end
     local getmousepos = vim.fn.getmousepos
-    vim.fn.getmousepos = function () return { winid = window, line = 2, column = 12 } end
+    vim.fn.getmousepos = function () return { winid = window, line = 2, column = 11 } end
     vim.fn.maparg("<LeftMouse>", "n", false, true).callback()
     vim.fn.getmousepos = getmousepos
     sidebar.close()
