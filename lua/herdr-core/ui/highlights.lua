@@ -52,6 +52,17 @@ function M.setup()
         fg = foreground,
         bg = blend(background, accent.fg or foreground, 0.18)
     })
+    -- Setup buttons share the space headings' colors: gray, and the accent where the cursor is.
+    vim.api.nvim_set_hl(0, "HerdrCoreButton", {
+        default = true,
+        fg = foreground,
+        bg = blend(background, foreground, 0.06)
+    })
+    vim.api.nvim_set_hl(0, "HerdrCoreButtonActive", {
+        default = true,
+        fg = foreground,
+        bg = blend(background, accent.fg or foreground, 0.18)
+    })
 end
 
 return M

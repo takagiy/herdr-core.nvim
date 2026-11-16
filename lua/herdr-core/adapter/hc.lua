@@ -109,12 +109,13 @@ local function terminal(record)
             "Invalid hc foreground"
         )
     end
+    local argv = foreground and foreground.argv or record.argv
     if record.status then
         assert(type(record.status) == "table" and type(record.status.state) == "string", "Invalid hc status")
     end
     assert(record.name == nil or type(record.name) == "string", "Invalid hc terminal name")
-    assert(record.argv == nil or (type(record.argv) == "table" and vim.islist(record.argv)), "Invalid hc argv")
-    for _, argument in ipairs(record.argv or {}) do
+    assert(argv == nil or (type(argv) == "table" and vim.islist(argv)), "Invalid hc argv")
+    for _, argument in ipairs(argv or {}) do
         assert(type(argument) == "string", "Invalid hc argv item")
     end
     return {
@@ -124,7 +125,9 @@ local function terminal(record)
         folder = folder(foreground and foreground.cwd or record.cwd),
         program = foreground and foreground.name or (record.argv and record.argv[1]),
         labels = record.labels,
+        argv = argv,
         status = record.status and record.status.state,
+        app = record.status and record.status.app ~= "" and record.status.app or nil,
         turn = integer(record.turn or 0),
         created_ms = integer(record.created_ms),
         status_ms = record.status_ms and integer(record.status_ms) or nil
@@ -158,29 +161,58 @@ function M.list(callback)
     end)
 end
 
+-- Agents read these to tell whether they run inside another agent. A core started from an agent passes them
+-- to every terminal, so a new terminal clears them, like Herdr TUI does for its panes.
+local inherited = {
+    "CODEX_THREAD_ID", "OMPCODE", "CLAUDECODE", "CLAUDE_CODE_CHILD_SESSION", "CLAUDE_CODE_SESSION_ID",
+    "CLAUDE_CODE_MESSAGING_TOKEN"
+}
+
+-- Terminals the plugin opens are kept: after a lost program or a reboot, hc gives them a shell in place.
 ---@param options  HerdrCoreRunOptions
 ---@param callback fun(address: string?, err: string?)
 function M.run(options, callback)
-    local argv = { "hc", "run", "--bg", "--json", "--cwd", options.folder }
-    if options.name then vim.list_extend(argv, {"--name", options.name}) end
-    local keys = vim.tbl_keys(options.labels)
+    local env = {}
+    for _, key in ipairs(inherited) do
+        env[key] = ""
+    end
+    local params = {
+        argv = options.argv or {},
+        cwd = options.folder,
+        env = env,
+        labels = next(options.labels) and options.labels or vim.empty_dict(),
+        keep = true
+    }
+    if options.name then params.name = options.name end
+    rpc("terminal.run", params, function (result, err)
+        if not result then
+            callback(nil, err)
+        elseif type(result.address) ~= "string" then
+            callback(nil, "hc run returned no address")
+        else
+            callback(result.address, nil)
+        end
+    end)
+end
+
+---@param address  string
+---@param text     string
+---@param callback fun(err: string?)
+function M.send(address, text, callback)
+    request({ "hc", "send", "--json", address, text }, function (_, err) callback(err) end)
+end
+
+---@param address  string
+---@param labels   table<string, string>
+---@param callback fun(err: string?)
+function M.labels(address, labels, callback)
+    local argv = { "hc", "label", "--json", address }
+    local keys = vim.tbl_keys(labels)
     table.sort(keys)
     for _, key in ipairs(keys) do
-        vim.list_extend(argv, { "--label", key .. "=" .. options.labels[key] })
+        argv[#argv + 1] = key .. "=" .. labels[key]
     end
-    argv[#argv + 1] = "--"
-    vim.list_extend(argv, options.argv or {})
-    request(argv, function (value, err)
-        if not value then
-            callback(nil, err)
-            return
-        end
-        if type(value.address) ~= "string" then
-            callback(nil, "hc run returned no address")
-            return
-        end
-        callback(value.address, nil)
-    end)
+    request(argv, function (_, err) callback(err) end)
 end
 
 ---@param address string
@@ -310,6 +342,7 @@ local function fact(message)
             type = "status_changed",
             terminal = event.terminal,
             status = status and status.state,
+            app = status and status.app ~= "" and status.app or nil,
             status_ms = os.time() * 1000
         }
     end
@@ -323,7 +356,8 @@ local function fact(message)
             type = "foreground_changed",
             terminal = event.terminal,
             folder = folder(data.cwd),
-            program = data.name
+            program = data.name,
+            argv = type(data.argv) == "table" and data.argv or nil
         }
     end
     if event.type == "labels" then

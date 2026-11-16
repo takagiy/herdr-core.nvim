@@ -172,4 +172,76 @@ T["saves window changes after the initial layout has loaded"] = function ()
     MiniTest.expect.equality(child.lua_get("requests.saved ~= nil"), true)
 end
 
+local tool = [[{
+    claude = false,
+    codex = false,
+    tool = {
+        directory = function () return vim.fn.stdpath('cache') end,
+        install = { { check = function () return 'missing' end, apply = function () end } },
+        resume_command = function (id) return 'tool --resume ' .. id end,
+        matches_program = function (program) return program.name == 'tool' end
+    }
+}]]
+
+T["resumes a conversation left in a terminal whose agent is gone"] = function ()
+    -- Given a terminal whose hook left a tool conversation and that now shows a shell
+    child.lua(fake)
+    child.lua(
+        [[
+        local hc = package.loaded['herdr-core.adapter.hc']
+        local watch = hc.watch
+        hc.watch = function (callback)
+            return watch(function (event)
+                if event.type == 'terminals_listed' then
+                    event.terminals[1].labels['herdr-core-nvim.agent'] = 'tool'
+                    event.terminals[1].labels['herdr-core-nvim.session'] = 'abc'
+                    event.terminals[1].program = 'zsh'
+                end
+                callback(event)
+            end)
+        end
+        requests.typed = {}
+        hc.labels = function (address, labels, callback) requests.cleared = { address, labels }; callback(nil) end
+        hc.send = function (address, text, callback) table.insert(requests.typed, { address, text }); callback(nil) end
+    ]]
+    )
+    -- When setup runs with that integration
+    child.lua("require('herdr-core').setup({ auto_insert = false, integrations = " .. tool .. " })")
+    child.lua([[vim.wait(1000, function () return #requests.typed > 0 end)]])
+    -- Then the labels are cleared first and the resume command is typed once
+    MiniTest.expect.equality(child.lua_get("requests.cleared"), {
+        "t1",
+        { ["herdr-core-nvim.agent"] = "", ["herdr-core-nvim.session"] = "" }
+    })
+    MiniTest.expect.equality(child.lua_get("requests.typed"), { { "t1", "tool --resume abc" } })
+end
+
+T["shows the Setup panel for an integration that needs it"] = function ()
+    -- Given an integration whose agent is installed but whose hook is not
+    child.lua(fake)
+    -- When setup runs
+    child.lua("require('herdr-core').setup({ auto_insert = false, integrations = " .. tool .. " })")
+    child.lua(
+        [[vim.wait(1000, function ()
+        for _, buffer in ipairs(vim.api.nvim_list_bufs()) do
+            if vim.b[buffer].herdr_core_sidebar then
+                return table.concat(vim.api.nvim_buf_get_lines(buffer, 0, -1, false), '\n'):find('tool', 1, true) ~= nil
+            end
+        end
+    end)]]
+    )
+    -- Then the sidebar offers to install it
+    local text = child.lua_get(
+        [[(function ()
+        for _, buffer in ipairs(vim.api.nvim_list_bufs()) do
+            if vim.b[buffer].herdr_core_sidebar then
+                return table.concat(vim.api.nvim_buf_get_lines(buffer, 0, -1, false), '\n')
+            end
+        end
+    end)()]]
+    )
+    MiniTest.expect.equality(text:find("Setup", 1, true) ~= nil, true)
+    MiniTest.expect.equality(text:find("tool%s+Install") ~= nil, true)
+end
+
 return T
