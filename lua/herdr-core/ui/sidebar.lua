@@ -355,12 +355,6 @@ function M.create(on_action, keys)
         vim.bo[buffer].modifiable = true
         vim.api.nvim_buf_set_lines(buffer, 0, -1, false, lines)
         vim.api.nvim_buf_clear_namespace(buffer, namespace, 0, -1)
-        if not collapsed and last_waiting > 0 then
-            vim.api.nvim_buf_set_extmark(buffer, namespace, 0, 0, {
-                virt_text = { { last_waiting .. " waiting  ", "HerdrCoreBlocked" } },
-                virt_text_pos = "right_align"
-            })
-        end
         -- Gray marks the terminal in front, the accent the row under the cursor, which wins on the same row.
         -- On a row with a button, the button alone shows the selection.
         local row = not on_button and selected or nil

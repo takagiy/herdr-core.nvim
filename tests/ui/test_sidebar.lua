@@ -57,7 +57,8 @@ T["draws headings counts and two-line terminals with highlights"] = function ()
         local details = assert(mark[4])
         if details.virt_text_pos == "right_align" then badge = details.virt_text end
     end
-    MiniTest.expect.equality(badge, { { "2 waiting  ", "HerdrCoreBlocked" } })
+    -- The space heading carries the count, so the header shows no total.
+    MiniTest.expect.equality(badge, nil)
     MiniTest.expect.equality(lines[#lines], string.rep(" ", 29) .. " « ")
 end
 
