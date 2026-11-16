@@ -2,7 +2,7 @@ local M = {}
 local attention = require("herdr-core.core.attention")
 
 ---@class HerdrCoreSidebarRow
----@field kind      'machine' | 'space' | 'terminal' | 'summary' | 'setup_heading' | 'setup_button' | 'setup_text' | 'setup_item' | 'setup_error'
+---@field kind      'machine' | 'space' | 'terminal' | 'summary' | 'new_terminal' | 'setup_heading' | 'setup_button' | 'setup_text' | 'setup_item' | 'setup_error'
 ---@field root      string?
 ---@field address   string?
 ---@field machine   string?
@@ -11,9 +11,9 @@ local attention = require("herdr-core.core.attention")
 ---@field lines     string[]
 ---@field waiting   integer?
 ---@field id        string?
----@field group?    string                                                                                                                        The Setup heading a setup row belongs to.
----@field name?     string                                                                                                                        The integration a setup item installs.
----@field button?   string                                                                                                                        The text of the row's button.
+---@field group?    string                                                                                                                                         The Setup heading a setup row belongs to.
+---@field name?     string                                                                                                                                         The integration a setup item installs.
+---@field button?   string                                                                                                                                         The text of the row's button.
 ---@field action?   'install' | 'install_all' | 'dismiss'
 
 ---@class HerdrCoreSidebarGroup

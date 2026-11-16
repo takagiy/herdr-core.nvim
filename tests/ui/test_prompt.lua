@@ -47,4 +47,74 @@ T["returns an empty name so the caller can clear it"] = function ()
     MiniTest.expect.equality(result, "")
 end
 
+---@type HerdrCoreChoice[]
+local places = {
+    { label = "app", detail = "Neovim folder", path = "/work/app" },
+    { label = "takag", detail = "Home", path = "/home/takag" },
+    { label = "api", detail = "/work/api", path = "/work/api" }
+}
+
+---@param keys string
+local function press(keys)
+    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(keys, true, false, true), "x", false)
+end
+
+T["lists the items in a centered floating window with the cursor row selected"] = function ()
+    -- Given an editor 100 columns by 30 lines
+    vim.o.columns, vim.o.lines = 100, 30
+    -- When the user is asked to choose a place
+    require("herdr-core.ui.prompt").choose(places, { prompt = "New terminal" }, function () end)
+    local window = vim.api.nvim_get_current_win()
+    local config = vim.api.nvim_win_get_config(window)
+    local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+    local highlight = vim.wo[window].winhighlight
+    local cursorline = vim.wo[window].cursorline
+    press("<Esc>")
+    -- Then each item has a row, the window sits in the middle, and the cursor row takes the selection color
+    MiniTest.expect.equality(config.relative, "editor")
+    MiniTest.expect.equality(
+        assert(lines[1]):find("app", 1, true) ~= nil and assert(lines[3]):find("/work/api", 1, true) ~= nil, true
+    )
+    local middle = assert(config.col) + assert(config.width) / 2
+    MiniTest.expect.equality(math.abs(middle - 50) <= 2, true)
+    MiniTest.expect.equality(cursorline, true)
+    MiniTest.expect.equality(highlight:find("CursorLine:HerdrCoreSelected", 1, true) ~= nil, true)
+end
+
+T["returns the item chosen with Enter or a click"] = function ()
+    -- Given the list of places
+    local chosen = {}
+    local prompt = require("herdr-core.ui.prompt")
+    -- When the user moves down and presses Enter, then clicks the third row
+    prompt.choose(places, {}, function (item) chosen[#chosen + 1] = item end)
+    press("j<CR>")
+    prompt.choose(places, {}, function (item) chosen[#chosen + 1] = item end)
+    local window = vim.api.nvim_get_current_win()
+    local getmousepos = vim.fn.getmousepos
+    vim.fn.getmousepos = function () return { winid = window, line = 3, column = 2 } end
+    vim.fn.maparg("<LeftRelease>", "n", false, true).callback()
+    vim.fn.getmousepos = getmousepos
+    -- Then each returns its item
+    MiniTest.expect.equality(chosen, { places[2], places[3] })
+end
+
+T["returns nil when the user closes or leaves the list"] = function ()
+    -- Given the list of places opened three times
+    local results = {}
+    local prompt = require("herdr-core.ui.prompt")
+    local editor = vim.api.nvim_get_current_win()
+    -- When it is closed with Esc, with q, and by moving to another window
+    for _, close in ipairs({
+        function () press("<Esc>") end,
+        function () press("q") end,
+        function () vim.api.nvim_set_current_win(editor) end
+    }) do
+        prompt.choose(places, {}, function (item) results[#results + 1] = item or false end)
+        close()
+    end
+    -- Then each reports no choice, and no list is left open
+    MiniTest.expect.equality(results, { false, false, false })
+    MiniTest.expect.equality(#vim.api.nvim_list_wins(), 1)
+end
+
 return T

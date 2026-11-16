@@ -8,7 +8,8 @@ local stop_previous
 ---@field sidebar_keys?  HerdrCoreSidebarKeys
 ---@field open?          fun(terminal: string): HerdrCoreOpenEffect
 ---@field notify?        fun(name: string, status: string)
----@field integrations?  table<string, table | false>               Integration definitions over the built-in ones; `false` turns one off.
+---@field picker?        fun(items: HerdrCoreChoice[], options: { prompt: string }, on_choice: fun(item: HerdrCoreChoice?)) Lists the places for a new terminal; vim.ui.select fits.
+---@field integrations?  table<string, table | false>                                                                       Integration definitions over the built-in ones; `false` turns one off.
 
 ---@param config? HerdrCoreConfig
 ---@return table
@@ -88,7 +89,7 @@ function M.setup(config)
             elseif row.action == "install_all" then
                 dispatch({ type = "setup_requested" })
             elseif row.action == "dismiss" then
-                dispatch({ type = "setup_dismissed", group = row.group })
+                dispatch({ type = "setup_dismissed" })
             end
             return
         end
@@ -111,14 +112,46 @@ function M.setup(config)
         elseif action == "unread" then
             dispatch({ type = "unread_requested", terminal = row.address })
         elseif action == "new_terminal" then
+            ---@param root string?
+            local function start(root)
+                dispatch({
+                    type = "new_terminal_requested",
+                    placement = "tab",
+                    tab = identifier(),
+                    space_root = root,
+                    editor_folder = vim.fn.getcwd()
+                })
+            end
+            if row.kind == "new_terminal" then
+                ---@type HerdrCoreChoice[]
+                local places = {}
+                ---@param path   string
+                ---@param detail string
+                local function offer(path, detail)
+                    path = vim.fs.normalize(path)
+                    for _, place in ipairs(places) do
+                        if place.path == path then return end
+                    end
+                    places[#places + 1] = { label = vim.fs.basename(path), detail = detail, path = path }
+                end
+                offer(vim.fn.getcwd(), "Neovim folder")
+                local home = vim.fn.expand("~") --[[@as string]]
+                offer(home, "Home")
+                local _, rows = core.view(loop.state())
+                for _, space in ipairs(rows) do
+                    -- A shell starts on this machine, so other machines' spaces are left out.
+                    if space.kind == "space" and space.root and not space.machine then
+                        offer(space.root, vim.fn.fnamemodify(space.root, ":~"))
+                    end
+                end
+                local picker = config.picker or require("herdr-core.ui.prompt").choose
+                picker(places, { prompt = "New terminal" }, function (place)
+                    if place then start(place.path) end
+                end)
+                return
+            end
             local record = row.address and loop.state().terminals[row.address]
-            dispatch({
-                type = "new_terminal_requested",
-                placement = "tab",
-                tab = identifier(),
-                space_root = row.root or (record and record.labels["herdr.space"]),
-                editor_folder = vim.fn.getcwd()
-            })
+            start(row.root or (record and record.labels["herdr.space"]))
         end
     end, config.sidebar_keys)
     -- Resume commands are typed one after another, a little apart, as Herdr TUI does.

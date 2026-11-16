@@ -20,10 +20,6 @@ function M.setup()
         Blocked = "DiagnosticWarn",
         Done = "DiagnosticOk",
         Error = "DiagnosticError",
-        Idle = "Comment",
-        Program = "Comment",
-        Active = "CursorLine",
-        Muted = "Comment",
         Machine = "Title"
     }) do
         vim.api.nvim_set_hl(0, "HerdrCore" .. name, { default = true, link = link })
@@ -40,29 +36,27 @@ function M.setup()
     local dark = vim.o.background == "dark"
     local background = normal.bg or (dark and 0x202020 or 0xfafafa)
     local foreground = normal.fg or (dark and 0xd0d0d0 or 0x303030)
-    vim.api.nvim_set_hl(0, "HerdrCoreSpace", {
-        default = true,
-        bold = true,
-        fg = foreground,
-        bg = blend(background, foreground, 0.06)
-    })
-    vim.api.nvim_set_hl(0, "HerdrCoreSpaceActive", {
-        default = true,
-        bold = true,
-        fg = foreground,
-        bg = blend(background, accent.fg or foreground, 0.18)
-    })
-    -- Setup buttons share the space headings' colors: gray, and the accent where the cursor is.
-    vim.api.nvim_set_hl(0, "HerdrCoreButton", {
-        default = true,
-        fg = foreground,
-        bg = blend(background, foreground, 0.06)
-    })
-    vim.api.nvim_set_hl(0, "HerdrCoreButtonActive", {
-        default = true,
-        fg = foreground,
-        bg = blend(background, accent.fg or foreground, 0.18)
-    })
+    local tint = accent.fg or foreground
+    -- Mixed from the theme, so a dark theme gets the same roles in dark colors.
+    -- Faint text stays readable on every row background, unlike the theme comment color.
+    local faint = blend(background, foreground, 0.8)
+    for name, colors in pairs({
+        Program = { fg = faint },
+        Idle = { fg = faint },
+        Muted = { fg = faint },
+        -- The terminal in front: a light lift.
+        Active = { bg = blend(background, foreground, 0.08) },
+        Space = { bold = true, fg = foreground, bg = blend(background, foreground, 0.06) },
+        -- The space holding the terminal in front: inverted, the strongest mark.
+        SpaceActive = { bold = true, fg = background, bg = blend(background, foreground, 0.85) },
+        -- The row under the cursor: a pale wash of the accent.
+        Selected = { fg = foreground, bg = blend(background, tint, 0.2) },
+        Button = { fg = foreground, bg = blend(background, foreground, 0.14) },
+        ButtonActive = { fg = foreground, bg = blend(background, tint, 0.35) }
+    }) do
+        colors.default = true
+        vim.api.nvim_set_hl(0, "HerdrCore" .. name, colors)
+    end
 end
 
 return M
