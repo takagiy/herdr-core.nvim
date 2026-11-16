@@ -96,7 +96,12 @@ local function show(value, buffer_for)
         local windows = {}
         for _, window in ipairs(vim.api.nvim_tabpage_list_wins(target)) do
             local id = vim.w[window].herdr_core_id
-            if id and vim.b[vim.api.nvim_win_get_buf(window)].herdr_core_address then windows[id] = window end
+            if id and vim.b[vim.api.nvim_win_get_buf(window)].herdr_core_address then
+                windows[id] = window
+            elseif id then
+                -- A window now showing a file keeps the id of its old terminal; drop it so no two windows share it.
+                vim.w[window].herdr_core_id = nil
+            end
         end
         ---@param leaf   HerdrCoreLayoutNode
         ---@param anchor integer
