@@ -2,6 +2,8 @@
 
 A TUI client for [herdr-core](https://github.com/herdrdev/herdr-core), built on Neovim.
 
+![The sidebar lists agent sessions by repository next to a Claude Code session and the file it is reading](docs/screenshot.png)
+
 ## Features
 
 - A sidebar groups sessions into spaces by Git repository or working directory, and shows each agent's status icon.
