@@ -4,6 +4,8 @@ local layout = require("herdr-core.core.layout")
 local attention = require("herdr-core.core.attention")
 local open = require("herdr-core.core.open")
 local sidebar = require("herdr-core.core.sidebar")
+local resume = require("herdr-core.core.resume")
+local setup = require("herdr-core.core.setup")
 local M = {}
 
 ---@class HerdrCoreSidebarRequested
@@ -15,17 +17,20 @@ local M = {}
 ---@field action 'toggle' | 'focus'
 
 ---@class HerdrCoreState
----@field terminals HerdrCoreTerminals
----@field spaces    HerdrCoreSpaces
----@field layout    HerdrCoreLayoutState
----@field focused   boolean
----@field shown     string[]
----@field read      table<string, integer>
----@field open?     fun(terminal: string): HerdrCoreOpenEffect
----@field folded    table<string, true>
----@field listed?   boolean                                    Whether the terminal list from the core has arrived.
----@field restored? boolean                                    Whether the saved layout has been restored with that list.
----@field sidebar?  HerdrCoreSidebarState
+---@field terminals  HerdrCoreTerminals
+---@field spaces     HerdrCoreSpaces
+---@field layout     HerdrCoreLayoutState
+---@field focused    boolean
+---@field shown      string[]
+---@field read       table<string, integer>
+---@field open?      fun(terminal: string): HerdrCoreOpenEffect
+---@field folded     table<string, true>
+---@field listed?    boolean                                    Whether the terminal list from the core has arrived.
+---@field restored?  boolean                                    Whether the saved layout has been restored with that list.
+---@field sidebar?   HerdrCoreSidebarState
+---@field setup      HerdrCoreSetupState
+---@field resuming   table<string, true>                        Terminals already asked to resume.
+---@field resumable? HerdrCoreResumable
 
 ---@class HerdrCoreMachineToggled
 ---@field type 'machine_toggled'
@@ -44,15 +49,16 @@ local M = {}
 ---@field terminal string
 
 ---@class HerdrCoreStateOptions
----@field open? fun(terminal: string): HerdrCoreOpenEffect
+---@field open?      fun(terminal: string): HerdrCoreOpenEffect
+---@field resumable? HerdrCoreResumable
 
 ---@class HerdrCoreTerminalChosen
 ---@field type     'terminal_chosen'
 ---@field terminal string
 ---@field windows  table<string, string>
 
----@alias HerdrCoreEvent HerdrCoreSidebarRequested | HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreMachineToggled | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict
----@alias HerdrCoreEffect HerdrCoreSidebarEffect | HerdrCoreSetLabel | HerdrCoreSpaceEffect | HerdrCoreLayoutEffect | HerdrCoreOpenEffect | HerdrCoreNotify | HerdrCoreRunShell
+---@alias HerdrCoreEvent HerdrCoreSetupChecked | HerdrCoreSetupRequested | HerdrCoreSetupResult | HerdrCoreSetupDismissed | HerdrCoreSidebarRequested | HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreMachineToggled | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict
+---@alias HerdrCoreEffect HerdrCoreResumeEffect | HerdrCoreInstallEffect | HerdrCoreSidebarEffect | HerdrCoreSetLabel | HerdrCoreSpaceEffect | HerdrCoreLayoutEffect | HerdrCoreOpenEffect | HerdrCoreNotify | HerdrCoreRunShell
 
 ---@class HerdrCoreUnknownEvent
 ---@field type 'unknown'
@@ -73,7 +79,10 @@ function M.new(options)
         shown = {},
         read = {},
         folded = {},
-        open = options and options.open
+        setup = setup.new(),
+        resuming = {},
+        open = options and options.open,
+        resumable = options and options.resumable
     }
 end
 
@@ -85,9 +94,14 @@ local function with(state, changes)
 end
 
 ---@param state HerdrCoreState
----@param event HerdrCoreSidebarRequested | HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreMachineToggled | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict | HerdrCoreUnknownEvent
+---@param event HerdrCoreSetupChecked | HerdrCoreSetupRequested | HerdrCoreSetupResult | HerdrCoreSetupDismissed | HerdrCoreSidebarRequested | HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreMachineToggled | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict | HerdrCoreUnknownEvent
 ---@return HerdrCoreState, HerdrCoreEffect[]
 function M.update(state, event)
+    if event.type == "setup_checked" or event.type == "setup_requested"
+        or event.type == "setup_result" or event.type == "setup_dismissed" then
+        local next_setup, effects = setup.update(state.setup, event)
+        return with(state, { setup = next_setup }), effects
+    end
     if event.type == "sidebar_requested" then
         return state, { { type = "sidebar", action = event.action } }
     end
@@ -148,7 +162,13 @@ function M.update(state, event)
             read, marks = attention.observe(read, after, state.focused, visible)
             vim.list_extend(effects, marks)
         end
-        return with(state, { terminals = next_terminals, read = read }), effects
+        local resuming = state.resuming
+        -- A cleared conversation may be resumed again after a later loss.
+        if after and (after.labels["herdr-core-nvim.session"] or "") == "" and resuming[event.terminal] then
+            resuming = vim.deepcopy(resuming)
+            resuming[event.terminal] = nil
+        end
+        return with(state, { terminals = next_terminals, read = read, resuming = resuming }), effects
     end
     if event.type == "repo_root_found" then
         ---@type HerdrCoreTerminal?
@@ -178,7 +198,9 @@ function M.update(state, event)
                 effects[#effects + 1] = effect
             end
         end
-        return with(state, { terminals = next_terminals, listed = true }), effects
+        local resuming, resumes = resume.find(event.terminals, state.resuming, state.resumable)
+        vim.list_extend(effects, resumes)
+        return with(state, { terminals = next_terminals, listed = true, resuming = resuming }), effects
     end
     if event.type == "foreground_changed" then
         local next_terminals = terminals.update(state.terminals, event)
@@ -211,7 +233,10 @@ function M.update(state, event)
             folder = event.terminal.folder,
             machine = event.terminal.machine
         })
-        return with(state, { terminals = updated, spaces = next_spaces, layout = state.layout }), effects
+        local resuming, resumes = resume.find({ event.terminal }, state.resuming, state.resumable)
+        vim.list_extend(effects, resumes)
+        return with(state, { terminals = updated, spaces = next_spaces, layout = state.layout, resuming = resuming }),
+            effects
     end
     return state, {}
 end
@@ -226,6 +251,7 @@ function M.view(state)
     for _, terminal in ipairs(list) do
         if attention.display(terminal).waiting then waiting = waiting + 1 end
     end
+    vim.list_extend(rows, setup.view(state.setup))
     return with(state, { sidebar = order }), rows, waiting
 end
 

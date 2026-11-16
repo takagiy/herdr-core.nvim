@@ -8,6 +8,8 @@ local M = {}
 ---@field status     string?
 ---@field turn       integer
 ---@field program    string?
+---@field argv?      string[]              The foreground program and its arguments.
+---@field app?       string                The name the agent reported to hc.
 ---@field folder     string
 ---@field created_ms integer
 ---@field status_ms  integer?
@@ -16,6 +18,7 @@ local M = {}
 ---@field type      'status_changed'
 ---@field terminal  string
 ---@field status    string?
+---@field app?      string
 ---@field status_ms integer
 
 ---@alias HerdrCoreTerminals table<string, HerdrCoreTerminal>
@@ -32,6 +35,7 @@ local M = {}
 ---@field type     'foreground_changed'
 ---@field terminal string
 ---@field program  string?
+---@field argv?    string[]
 ---@field folder   string?
 
 ---@class HerdrCoreLabelsChanged
@@ -109,15 +113,19 @@ function M.update(state, event)
                 status = current.status,
                 turn = current.turn,
                 program = current.program,
+                argv = current.argv,
+                app = current.app,
                 folder = current.folder,
                 created_ms = current.created_ms,
                 status_ms = current.status_ms
             }
             if event.type == "foreground_changed" then
                 terminal.program = event.program
+                terminal.argv = event.argv
                 terminal.folder = event.folder or current.folder
             elseif event.type == "status_changed" then
                 terminal.status = event.status
+                terminal.app = event.app
                 terminal.status_ms = event.status_ms
             elseif event.type == "labels_changed" then
                 terminal.labels = event.labels

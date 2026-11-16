@@ -49,39 +49,71 @@ T["keeps a remote terminal address qualified when attaching"] = function ()
     MiniTest.expect.equality(argv, { "hc", "attach", "server/t1" })
 end
 
-T["starts a background terminal with cwd name and labels"] = function ()
-    -- Given a process returning a new terminal address
-    local calls = fake_process('{"address":"t2"}')
+T["starts a kept terminal without agent identity variables"] = function ()
+    -- Given hc answering terminal.run with a new address
+    local calls, options = fake_process(vim.json.encode({ jsonrpc = "2.0", id = 1, result = { address = "t2" } }))
     ---@type string?
     local address
-    -- When a background program is started
+    -- When a program is started with a folder, name and labels
     require("herdr-core.adapter.hc").run({
         folder = "/project with spaces",
         name = "build",
-        labels = {
-            ["herdr.tab"] = "tab1"
-        },
+        labels = { ["herdr.tab"] = "tab1" },
         argv = { "claude" }
-    },
-        function (value)
-            address = value
-        end)
-    -- Then values remain separate argv entries and the address is returned
-    MiniTest.expect.equality(calls[1], {
-        "hc",
-        "run",
-        "--bg",
-        "--json",
-        "--cwd",
-        "/project with spaces",
-        "--name",
-        "build",
-        "--label",
-        "herdr.tab=tab1",
-        "--",
-        "claude"
-    })
+    }, function (value) address = value end)
+    -- Then hc keeps it and clears what would make agents think they run inside another agent
+    local request = vim.json.decode(assert(options[1]).stdin)
+    MiniTest.expect.equality(calls[1], { "hc", "connect" })
+    MiniTest.expect.equality(request.method, "terminal.run")
+    MiniTest.expect.equality(request.params.keep, true)
+    MiniTest.expect.equality(request.params.argv, { "claude" })
+    MiniTest.expect.equality(request.params.cwd, "/project with spaces")
+    MiniTest.expect.equality(request.params.name, "build")
+    MiniTest.expect.equality(request.params.labels, { ["herdr.tab"] = "tab1" })
+    MiniTest.expect.equality(request.params.env.CODEX_THREAD_ID, "")
+    MiniTest.expect.equality(request.params.env.CLAUDECODE, "")
     MiniTest.expect.equality(address, "t2")
+end
+
+T["types text into a terminal and sets several labels at once"] = function ()
+    -- Given hc accepting commands
+    local calls = fake_process("{}")
+    local errors = {}
+    local hc = require("herdr-core.adapter.hc")
+    -- When a line is sent and two labels are set
+    hc.send("t3", "codex resume abc", function (err) errors[#errors + 1] = err or false end)
+    hc.labels("t3", { ["herdr-core-nvim.session"] = "", ["herdr-core-nvim.agent"] = "" }, function (err)
+        errors[#errors + 1] = err or false
+    end)
+    -- Then each is one hc call with its own arguments
+    MiniTest.expect.equality(calls, {
+        { "hc", "send", "--json", "t3", "codex resume abc" },
+        { "hc", "label", "--json", "t3", "herdr-core-nvim.agent=", "herdr-core-nvim.session=" }
+    })
+    MiniTest.expect.equality(errors, { false, false })
+end
+
+T["keeps the foreground arguments and the agent name for telling programs apart"] = function ()
+    -- Given a terminal running node with a script, whose agent reported its own name
+    fake_process(vim.json.encode({
+            terminals = {
+                {
+                    address = "t1",
+                    cwd = "/app",
+                    foreground = { name = "node", cwd = "/app", argv = { "node", "/opt/gemini/gemini.js" } },
+                    labels = {},
+                    status = { state = "idle", app = "gemini" },
+                    created_ms = 1
+                }
+            }
+        }))
+    ---@type HerdrCoreTerminalsListed?
+    local event
+    -- When the list is converted
+    require("herdr-core.adapter.hc").list(function (value) event = value end)
+    -- Then the terminal carries both
+    local terminal = assert(assert(event).terminals[1])
+    MiniTest.expect.equality({ terminal.argv, terminal.app }, { { "node", "/opt/gemini/gemini.js" }, "gemini" })
 end
 
 T["converts a terminal list to a core event"] = function ()

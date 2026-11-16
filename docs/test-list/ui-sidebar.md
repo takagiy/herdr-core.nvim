@@ -36,3 +36,6 @@ The sidebar window.
 - [x] ユーザーが移動キーにアクションを割り当てた場合、移動より指定したアクションを優先する。
 
 - [x] 下端のトグルを右端に表示し、リサイズ・折りたたみ後も表示されたボタンをクリックして開閉できる。
+- [x] When rows include a Setup panel, the sidebar can draw it in a box above the toggle with its buttons in one column.
+- [x] When the user moves with `j`/`k`, the sidebar can stop on Setup buttons, color the one under the cursor and press it with Enter.
+- [x] When the sidebar is collapsed and something needs setting up, the sidebar can show `!` under the count.

@@ -2,6 +2,56 @@ local M = {}
 
 local symbols = { working = "◐", blocked = "●", error = "✗", done = "✓", idle = "○" }
 
+-- Labels on the left of the Setup panel take this many columns; buttons start after them.
+local label_width = 12
+
+---@param text  string
+---@param width integer
+---@return string
+local function fit(text, width)
+    local shown = vim.fn.strcharpart(text, 0, width)
+    while vim.fn.strdisplaywidth(shown) > width do
+        shown = vim.fn.strcharpart(shown, 0, vim.fn.strchars(shown) - 1)
+    end
+    return shown .. string.rep(" ", width - vim.fn.strdisplaywidth(shown))
+end
+
+---@class HerdrCoreSetupLine
+---@field text          string
+---@field row?          HerdrCoreSidebarRow
+---@field group?        string
+---@field button_start? integer             Byte column where the button starts.
+---@field button_end?   integer
+
+-- The Setup panel as boxed lines, each knowing its row and where its button is.
+---@param rows  HerdrCoreSidebarRow[]
+---@param width integer
+---@return HerdrCoreSetupLine[]
+local function setup_box(rows, width)
+    if #rows == 0 then return {} end
+    local inner = math.max(label_width + 2, width - 4)
+    local lines = { { text = " ╭ Setup " .. string.rep("─", inner - 7) .. "╮", group = "HerdrCoreMuted" } }
+    for _, row in ipairs(rows) do
+        local indent = (row.kind == "setup_item" or row.kind == "setup_error") and "  " or " "
+        local left = indent .. (row.lines[1] or "")
+        local line = { row = row }
+        if row.button then
+            left = fit(left, label_width)
+            local button = " " .. row.button .. " "
+            line.text = " │" .. left .. fit(button, inner - label_width) .. "│"
+            line.button_start = #(" │" .. left)
+            line.button_end = line.button_start + #button
+            line.group = row.kind == "setup_heading" and "HerdrCoreHeader" or nil
+        else
+            line.text = " │" .. fit(left, inner) .. "│"
+            line.group = "HerdrCoreMuted"
+        end
+        lines[#lines + 1] = line
+    end
+    lines[#lines + 1] = { text = " ╰" .. string.rep("─", inner) .. "╯", group = "HerdrCoreMuted" }
+    return lines
+end
+
 ---@class HerdrCoreSidebarView
 ---@field buffer integer
 ---@field render fun(rows: HerdrCoreSidebarRow[], waiting: integer?)
@@ -58,7 +108,9 @@ function M.create(on_action, keys)
         end
         local action = column and plus[line] == column and "new_terminal" or "activate"
         local row = by_line[line]
-        if action == "activate" and row and row.kind == "space" then return end
+        if action == "activate" and row and (row.kind == "space" or (row.kind:find("^setup_") and not row.action)) then
+            return
+        end
         if on_action then on_action(action, row) end
     end
     ---@param direction integer
@@ -154,6 +206,12 @@ function M.create(on_action, keys)
             end)
         end
     })
+    -- Redraw so the Setup button under the cursor takes the active color.
+    vim.api.nvim_create_autocmd("CursorMoved", {
+        group = group,
+        buffer = buffer,
+        callback = function () render(last_rows, last_waiting) end
+    })
     -- Redraw so the toggle stays on the bottom line when the window height changes.
     vim.api.nvim_create_autocmd({ "VimResized", "WinResized" }, {
         group = group,
@@ -169,13 +227,19 @@ function M.create(on_action, keys)
         local active = vim.t.herdr_core_active_terminal
         ---@type { first: integer, last: integer }?
         local selected
-        ---@type { row: integer, group: string, start_col: integer?, end_col: integer? } []
+        ---@type { row: integer, group: string, start_col: integer?, end_col: integer?, priority: integer? } []
         local marks = { { row = 0, group = collapsed and "HerdrCoreMuted" or "HerdrCoreHeader" } }
         local space_mark = 0
         by_line = {}
         plus = {}
         positions = {}
+        local setup_rows = vim.tbl_filter(function (row) return row.kind:find("^setup_") ~= nil end, rows)
+        if collapsed and #setup_rows > 0 then
+            lines[#lines + 1] = "!"
+            marks[#marks + 1] = { row = #lines - 1, group = "HerdrCoreBlocked" }
+        end
         for _, row in ipairs(collapsed and {} or rows) do
+            if row.kind:find("^setup_") then goto continue end
             if row.kind == "space" and #lines > 1 then lines[#lines + 1] = "" end
             local start = #lines + 1
             if row.kind == "space" then
@@ -213,6 +277,7 @@ function M.create(on_action, keys)
             for line = start, #lines do
                 by_line[line] = row
             end
+            ::continue::
         end
         -- The toggle sits on the window's bottom line, below the rows.
         local height, footer_width = 0, collapsed and 3 or width
@@ -222,8 +287,36 @@ function M.create(on_action, keys)
                 footer_width = vim.api.nvim_win_get_width(window)
             end
         end
-        while #lines < height - 1 do
+        local box = collapsed and {} or setup_box(setup_rows, footer_width)
+        while #lines < height - 1 - #box do
             lines[#lines + 1] = ""
+        end
+        if #box > 0 and lines[#lines] ~= "" then lines[#lines + 1] = "" end
+        local cursor
+        for _, window in ipairs(vim.api.nvim_list_wins()) do
+            if vim.api.nvim_win_get_buf(window) == buffer then cursor = vim.api.nvim_win_get_cursor(window)[1] end
+        end
+        for _, entry in ipairs(box) do
+            lines[#lines + 1] = entry.text
+            local line = #lines
+            if entry.group then
+                marks[#marks + 1] = { row = line - 1, group = entry.group }
+            end
+            if entry.row then by_line[line] = entry.row end
+            if entry.button_start then
+                positions[#positions + 1] = line
+                local focused = cursor == line
+                if focused then
+                    marks[#marks + 1] = { row = line - 1, group = "HerdrCoreActive" }
+                end
+                marks[#marks + 1] = {
+                    row = line - 1,
+                    group = focused and "HerdrCoreButtonActive" or "HerdrCoreButton",
+                    start_col = entry.button_start,
+                    end_col = entry.button_end,
+                    priority = 5000
+                }
+            end
         end
         lines[#lines + 1] = string.rep(" ", math.max(0, footer_width - 1)) .. (collapsed and "»" or "«")
         marks[#marks + 1] = { row = #lines - 1, group = "HerdrCoreMuted" }
@@ -251,7 +344,8 @@ function M.create(on_action, keys)
                 end_row = mark.end_col and mark.row or mark.row + 1,
                 end_col = mark.end_col,
                 hl_group = mark.group,
-                hl_eol = not mark.end_col
+                hl_eol = not mark.end_col,
+                priority = mark.priority
             })
         end
         vim.bo[buffer].modifiable = false
