@@ -40,7 +40,7 @@ T["activates a sidebar item with one click from another window"] = function ()
     -- Given the cursor in the editor rather than the sidebar
     local side = child.lua_get("side")
     -- When clicking the terminal once
-    click(side, 2)
+    click(side, 3)
     local actions = child.lua_get("actions")
     -- Then the same click both focuses the sidebar and activates the terminal
     MiniTest.expect.equality(child.api.nvim_get_current_win(), side)
@@ -67,7 +67,7 @@ T["keeps terminal focus after one click with an existing global mouse mapping"] 
     ]]
     )
     -- When clicking the terminal from the editor once
-    click(child.lua_get("side"), 2)
+    click(child.lua_get("side"), 3)
     -- Then the native mapping still runs and activation happens exactly once
     MiniTest.expect.equality(child.lua_get("actions"), { { "activate", "t1" } })
     MiniTest.expect.equality(child.lua_get("hover_called"), true)
@@ -83,20 +83,12 @@ T["stops observing mouse input when the sidebar closes"] = function ()
     MiniTest.expect.equality(child.lua_get("vim.on_key()"), before - 1)
 end
 
-local plus = MiniTest.new_set({ parametrize = { { "/app", 0 }, { "/app", 2 }, { "/日本語", 1 } } })
-T["plus button"] = plus
-
----@param root    string
----@param waiting integer
-plus["starts a terminal at the visible plus after Unicode text"] = function (root, waiting)
-    -- Given a heading with a optional count and project name
-    child.lua("sidebar.render({ { kind='space', root=..., waiting=select(2, ...), lines={} } }, 0)", { root, waiting })
-    local buffer = child.lua_get("sidebar.buffer")
-    local heading = assert(child.api.nvim_buf_get_lines(buffer, 1, 2, false)[1])
-    -- When clicking the actual displayed plus from the editor window
-    click(child.lua_get("side"), 2, #heading)
-    -- Then it requests a terminal instead of toggling the project's fold
-    MiniTest.expect.equality(child.lua_get("actions"), { { "new_terminal", root } })
+T["presses New terminal with one click from another window"] = function ()
+    -- Given the cursor in the editor
+    -- When the New terminal button under the header is clicked
+    click(child.lua_get("side"), 2, 3)
+    -- Then it is reported without a space, for the plugin to ask where
+    MiniTest.expect.equality(child.lua_get("actions"), { { "new_terminal" } })
 end
 
 T["keeps the footer toggle at the right edge when resized and collapsed"] = function ()
@@ -113,12 +105,12 @@ T["keeps the footer toggle at the right edge when resized and collapsed"] = func
     local line, text = footer()
     -- When inspecting and clicking the visible toggle at the right edge
     MiniTest.expect.equality(child.fn.strdisplaywidth(text), 24)
-    MiniTest.expect.equality(text, string.rep(" ", 23) .. "«")
+    MiniTest.expect.equality(text, string.rep(" ", 21) .. " « ")
     click(side, line, #text - 1)
     local narrow_line, narrow_text = footer()
     -- Then the collapsed toggle is also right-aligned and can expand again
     MiniTest.expect.equality(child.api.nvim_win_get_width(side), 3)
-    MiniTest.expect.equality(narrow_text, "  »")
+    MiniTest.expect.equality(narrow_text, " » ")
     click(side, narrow_line, #narrow_text - 1)
     MiniTest.expect.equality(child.api.nvim_win_get_width(side), 32)
 end

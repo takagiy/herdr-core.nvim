@@ -244,4 +244,70 @@ T["shows the Setup panel for an integration that needs it"] = function ()
     MiniTest.expect.equality(text:find("tool%s+Install") ~= nil, true)
 end
 
+-- Presses the sidebar's New terminal button with Enter.
+local press_new_terminal = [[
+    vim.wait(1000, function () return #require('herdr-core.ui.layout').read().tabs == 1 end)
+    for _, w in ipairs(vim.api.nvim_list_wins()) do
+        if vim.b[vim.api.nvim_win_get_buf(w)].herdr_core_sidebar then vim.api.nvim_set_current_win(w) end
+    end
+    for line, text in ipairs(vim.api.nvim_buf_get_lines(0, 0, -1, false)) do
+        if text:find('New terminal', 1, true) then vim.api.nvim_win_set_cursor(0, { line, 0 }) end
+    end
+    vim.fn.maparg('<CR>', 'n', false, true).callback()
+]]
+
+T["offers the Neovim folder, home and this machine's spaces for a new terminal"] = function ()
+    -- Given a terminal in the /app space, a picker that takes the last place, and an hc run response
+    child.lua(fake)
+    child.lua(
+        [[
+        package.loaded['herdr-core.adapter.hc'].run = function (options, callback)
+            requests.run = options
+            callback('t2')
+        end
+    ]]
+    )
+    child.lua(
+        [[require('herdr-core').setup({ auto_insert = false, picker = function (items, options, on_choice)
+        requests.places = vim.tbl_map(function (item) return item.path end, items)
+        requests.prompt = options.prompt
+        on_choice(items[#items])
+    end })]]
+    )
+    -- When the user presses New terminal
+    child.lua(press_new_terminal)
+    child.lua([[vim.wait(1000, function () return requests.run ~= nil end)]])
+    -- Then the places are the Neovim folder, home and the space, each once, and the shell starts in the chosen one
+    local expected = child.lua_get(
+        [[(function ()
+        local places = {}
+        for _, path in ipairs({ vim.fn.getcwd(), vim.fn.expand('~'), '/app' }) do
+            path = vim.fs.normalize(path)
+            if not vim.tbl_contains(places, path) then places[#places + 1] = path end
+        end
+        return places
+    end)()]]
+    )
+    MiniTest.expect.equality(child.lua_get("requests.places"), expected)
+    MiniTest.expect.equality(child.lua_get("requests.prompt"), "New terminal")
+    MiniTest.expect.equality(child.lua_get("requests.run.folder"), "/app")
+end
+
+T["starts nothing when the picker returns no place"] = function ()
+    -- Given a picker that is closed without a choice
+    child.lua(fake)
+    child.lua([[package.loaded['herdr-core.adapter.hc'].run = function () requests.run = true end]])
+    child.lua(
+        [[require('herdr-core').setup({ auto_insert = false, picker = function (_, _, on_choice)
+        requests.asked = true
+        on_choice(nil)
+    end })]]
+    )
+    -- When the user presses New terminal
+    child.lua(press_new_terminal)
+    -- Then no shell is started
+    MiniTest.expect.equality(child.lua_get("requests.asked"), true)
+    MiniTest.expect.equality(child.lua_get("requests.run"), vim.NIL)
+end
+
 return T

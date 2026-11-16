@@ -3,12 +3,12 @@
 The sidebar window.
 
 - [x] When given rows, the sidebar can draw headings, two-line terminal rows and counts with `HerdrCore` highlights.
-- [x] When a space heading is drawn, the sidebar can show the folder's name instead of its full path, so that `+` stays in view.
+- [x] When a space heading is drawn, the sidebar can show the folder's name instead of its full path.
 - [x] When the user switches tabpages, the sidebar can stay on the same side and width.
 - [x] When a new tabpage is opened from the sidebar window, the sidebar can appear in it beside the new window.
 - [x] When the user presses Enter or clicks on a terminal row, the sidebar can report that terminal as chosen.
 - [x] space 見出しで Enter を押したりクリックしたりしても、開閉せずアクションを発行しない。
-- [x] When the user presses `n` on a row or clicks a heading's `+`, the sidebar can report a new terminal for that row's space.
+- [x] When the user presses `n` on a row, the sidebar can report a new terminal for that row's space.
 - [x] When a terminal is working, blocked, done or idle, the sidebar can show a different symbol for each.
 - [x] When the user presses the rename key, the sidebar can ask for a name and report it for that terminal.
 - [x] When the user presses the pin or unread key, the sidebar can report it for that terminal.
@@ -29,7 +29,6 @@ The sidebar window.
 - [x] サイドバーの外をクリックすると、標準のマウス操作でそのウィンドウに移動する。
 - [x] 既存のグローバルマウスマッピングを残したまま、項目の操作を1回だけ実行する。
 - [x] サイドバーを閉じると、マウス入力の監視を解除する。
-- [x] 待機件数・日本語を含む見出しでも、表示された + をクリックしてターミナルを起動する。
 
 - [x] 選択中のterminalが属するspaceの見出しを、通常と異なる全幅の背景色で表示する。
 
@@ -39,3 +38,7 @@ The sidebar window.
 - [x] When rows include a Setup panel, the sidebar can draw it in a box above the toggle with its buttons in one column.
 - [x] When the user moves with `j`/`k`, the sidebar can stop on Setup buttons, color the one under the cursor and press it with Enter.
 - [x] When the sidebar is collapsed and something needs setting up, the sidebar can show `!` under the count.
+- [x] When the sidebar is drawn, it can show a New terminal button under the header and report it when pressed with Enter or a click.
+- [x] When the user moves with `j`/`k`, the sidebar can skip space headings, which have no button.
+- [x] When the cursor is in the sidebar, the sidebar can give the row under it the selection background and its button the accent, while the terminal in front keeps its gray.
+- [x] When the sidebar draws the New terminal button, the toggle and Setup buttons, it can give them all the same button background.

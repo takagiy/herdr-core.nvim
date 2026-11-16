@@ -113,12 +113,12 @@ T["starts a shell in Neovim's folder when opened from a file window"] = function
     MiniTest.expect.equality(vim.fs.normalize(new_terminal(before).cwd), vim.fs.normalize(session.root))
 end
 
-local openers = MiniTest.new_set({ parametrize = { { "n" }, { "plus" } } })
--- When a new shell is opened from a space heading with `n` or a click on `+`, it can start in that space's folder.
+local openers = MiniTest.new_set({ parametrize = { { "n" }, { "button" } } })
+-- When a new shell is opened with `n` on a space heading, or with New terminal and that space chosen, it can start in that space's folder.
 T["starts a shell in the space of a heading"] = openers
 
 ---@param method string
-openers["with n or the plus button"] = function (method)
+openers["with n or the New terminal button"] = function (method)
     -- Given: a space heading for an agent's folder
     local folder = session.root .. "/space"
     vim.fn.mkdir(folder, "p")
@@ -126,16 +126,20 @@ openers["with n or the plus button"] = function (method)
     local child = session.editor()
     local line = session.row(child, vim.fs.basename(folder))
     local before = addresses()
-    -- When: the user presses n on the heading, or clicks its +
-    child.type_keys(tostring(line) .. "G")
+    -- When: the user presses n on the heading, or presses New terminal and chooses the space
     if method == "n" then
+        child.type_keys(tostring(line) .. "G")
         child.type_keys("n")
     else
-        child.type_keys("<C-l>")
-        local text = child.api.nvim_buf_get_lines(0, line - 1, line, false)[1]
-        local pos = child.fn.screenpos(child.api.nvim_get_current_win(), line, #text)
-        child.api.nvim_input_mouse("left", "press", "", 0, pos.row - 1, pos.col - 1)
-        child.api.nvim_input_mouse("left", "release", "", 0, pos.row - 1, pos.col - 1)
+        child.type_keys(tostring(session.row(child, "New terminal")) .. "G")
+        child.type_keys("<CR>")
+        ---@type integer?
+        local choice
+        for index, text in ipairs(child.api.nvim_buf_get_lines(0, 0, -1, false)) do
+            if text:find(vim.fs.basename(folder), 1, true) then choice = index end
+        end
+        child.type_keys(tostring(assert(choice, "The space must be offered")) .. "G")
+        child.type_keys("<CR>")
     end
     -- Then: the new shell starts in that space's folder
     MiniTest.expect.equality(vim.fs.normalize(new_terminal(before).cwd), vim.fs.normalize(folder))

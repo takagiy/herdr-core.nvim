@@ -58,7 +58,7 @@ T["draws the Setup panel above the toggle with aligned buttons"] = function ()
         " │              Dismiss       │"
     })
     MiniTest.expect.equality(lines[count - 1], " ╰" .. string.rep("─", 28) .. "╯")
-    MiniTest.expect.equality(#buttons, 3)
+    MiniTest.expect.equality(#buttons, 5)
     MiniTest.expect.equality(vim.fn.strdisplaywidth(assert(lines[count - 7])), 31)
 end
 
@@ -71,7 +71,7 @@ T["moves onto Setup buttons and presses the one under the cursor"] = function ()
     local window = sidebar.show(32)
     sidebar.render(rows, 0)
     vim.api.nvim_set_current_win(window)
-    vim.api.nvim_win_set_cursor(window, { 3, 0 })
+    vim.api.nvim_win_set_cursor(window, { 5, 0 })
     -- When the user moves down twice and presses Enter
     vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("jj<CR>", true, false, true), "x", false)
     vim.api.nvim_exec_autocmds("CursorMoved", { buffer = sidebar.buffer })
