@@ -127,4 +127,40 @@ T["attaches inside the existing URI read buffer"] = function ()
     vim.api.nvim_buf_delete(attached, { force = true })
 end
 
+-- When a terminal is opened again while its attach is still running, the plugin can reuse that buffer.
+T["reuses a buffer whose attach is still running"] = function ()
+    -- Given a terminal buffer whose attach process keeps running
+    local terminal = require("herdr-core.ui.terminal")
+    local running = { vim.v.progpath, "--headless", "--clean", "+sleep 2", "+qa!" }
+    local first = terminal.buffer({ address = "running" }, running)
+    -- When the same terminal is opened again
+    local second = terminal.buffer({ address = "running" }, running)
+    vim.api.nvim_buf_delete(first, { force = true })
+    -- Then the same buffer is returned
+    MiniTest.expect.equality(second, first)
+end
+
+-- When a terminal is opened again after its attach exited, the plugin can start a new attach in the windows that showed it.
+T["replaces a buffer whose attach exited"] = function ()
+    -- Given a terminal buffer shown in the current window whose attach process has exited
+    local terminal = require("herdr-core.ui.terminal")
+    local original = vim.api.nvim_get_current_buf()
+    local exited = terminal.buffer({ address = "exited" }, { vim.v.progpath, "--version" })
+    vim.api.nvim_set_current_buf(exited)
+    local window = vim.api.nvim_get_current_win()
+    vim.fn.jobwait({ vim.b[exited].terminal_job_id }, 5000)
+    -- When the same terminal is opened again
+    local replaced = terminal.buffer(
+        { address = "exited" }, { vim.v.progpath, "--headless", "--clean", "+sleep 2", "+qa!" }
+    )
+    local shown, old_exists = vim.api.nvim_win_get_buf(window), vim.api.nvim_buf_is_valid(exited)
+    local running = vim.fn.jobwait({ vim.b[replaced].terminal_job_id }, 0)[1] == -1
+    local name = vim.api.nvim_buf_get_name(replaced)
+    vim.api.nvim_set_current_buf(original)
+    vim.api.nvim_buf_delete(replaced, { force = true })
+    -- Then a new running attach takes the old buffer's place, name and window
+    MiniTest.expect.equality(replaced ~= exited, true)
+    MiniTest.expect.equality({ shown, old_exists, running, name }, { replaced, false, true, "herdr://exited" })
+end
+
 return T

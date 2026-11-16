@@ -250,6 +250,81 @@ T["folds a machine and unfolds it again"] = function ()
     MiniTest.expect.equality(unfolded.folded["machine:vps"], nil)
 end
 
+-- When a machine heading is folded, `view` can still count that machine's terminals waiting for the user.
+T["counts waiting terminals on a folded machine"] = function ()
+    -- Given a blocked terminal on a remote machine whose heading is folded
+    local core = require("herdr-core.core.state")
+    local state = core.new()
+    state.terminals["vps/t1"] = terminal("vps/t1", { machine = "vps", status = "blocked" })
+    state = core.update(state, { type = "machine_toggled", id = "machine:vps" })
+    -- When the view is taken
+    local _, _, waiting = core.view(state)
+    -- Then the hidden terminal still counts as waiting
+    MiniTest.expect.equality(waiting, 1)
+end
+
+-- When a saved layout names terminals that finished while no Neovim was running, `update` can restore it without them and save the result.
+T["restores a saved layout without terminals that finished meanwhile"] = function ()
+    -- Given a terminal list holding only t1, and a saved split of t1 and the finished t4
+    local core = require("herdr-core.core.state")
+    local state = core.update(core.new(), { type = "terminals_listed", terminals = { terminal("t1") } })
+    local saved = {
+        tabs = {
+            {
+                id = "tab1",
+                root = {
+                    kind = "split",
+                    id = "s1",
+                    axis = "row",
+                    children = {
+                        { kind = "terminal", id = "w1", terminal = "t1" },
+                        { kind = "terminal", id = "w4", terminal = "t4" }
+                    }
+                }
+            },
+            { id = "tab2", root = { kind = "terminal", id = "w5", terminal = "t4" } }
+        }
+    }
+    -- When the saved layout is loaded
+    local _, effects = core.update(state, { type = "layout_loaded", value = saved, version = 3 })
+    -- Then only t1 is shown, and the layout without t4 is saved
+    local alive = { tabs = { { id = "tab1", root = { kind = "terminal", id = "w1", terminal = "t1" } } } }
+    MiniTest.expect.equality(effects, {
+        { type = "show_layout", value = alive },
+        { type = "save_layout", value = alive, version = 3 }
+    })
+end
+
+-- When a saved layout loads before the terminal list, `update` can keep every terminal in it.
+T["keeps the saved layout when the terminal list is not known yet"] = function ()
+    -- Given no terminal list yet, and a saved layout with t4
+    local core = require("herdr-core.core.state")
+    local saved = { tabs = { { id = "tab1", root = { kind = "terminal", id = "w4", terminal = "t4" } } } }
+    -- When the saved layout is loaded
+    local _, effects = core.update(core.new(), { type = "layout_loaded", value = saved, version = 3 })
+    -- Then it is shown as saved and not overwritten
+    MiniTest.expect.equality(effects, { { type = "show_layout", value = saved } })
+end
+
+-- When a later layout names a terminal whose start event has not arrived yet, `update` can keep that terminal.
+T["keeps a new terminal in a later layout before its start event"] = function ()
+    -- Given a restored layout of t1
+    local core = require("herdr-core.core.state")
+    local one = { tabs = { { id = "tab1", root = { kind = "terminal", id = "w1", terminal = "t1" } } } }
+    local state = core.update(core.new(), { type = "terminals_listed", terminals = { terminal("t1") } })
+    state = core.update(state, { type = "layout_loaded", value = one, version = 1 })
+    -- When a later layout adds t2, which the core has not reported yet
+    local two = {
+        tabs = {
+            { id = "tab1", root = { kind = "terminal", id = "w1", terminal = "t1" } },
+            { id = "tab2", root = { kind = "terminal", id = "w2", terminal = "t2" } }
+        }
+    }
+    local _, effects = core.update(state, { type = "layout_loaded", value = two, version = 2 })
+    -- Then t2 is shown, not dropped
+    MiniTest.expect.equality(effects, { { type = "show_layout", value = two } })
+end
+
 -- When the user asks for a new terminal, `update` can ask for a shell where the opening policy decides.
 T["asks for a shell in the folder the request came from"] = function ()
     -- Given a request from a terminal window in /app/src, under the space /app

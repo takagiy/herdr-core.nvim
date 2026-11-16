@@ -20,3 +20,7 @@ The core's single entry point.
 - [x] When the state changes, `view` can return the sidebar rows and the number of terminals waiting, keeping their order.
 - [x] When a foreground program changes without the folder changing, `update` can skip looking up the repository root again.
 - [x] When a sidebar action is requested, `update` can return the corresponding UI effect.
+- [x] When a machine heading is folded, `view` can still count that machine's terminals waiting for the user.
+- [x] When a saved layout names terminals that finished while no Neovim was running, `update` can restore it without them and save the result.
+- [x] When a saved layout loads before the terminal list, `update` can keep every terminal in it.
+- [x] When a later layout names a terminal whose start event has not arrived yet, `update` can keep that terminal.
