@@ -275,4 +275,43 @@ T["updates the order of existing terminal tabs"] = function ()
     MiniTest.expect.equality(actual.tabs, { second, first })
 end
 
+T["gives each terminal window its own id after a file window shows a terminal again"] = function ()
+    -- Given a shown terminal window that the user switched to a file
+    local layout = require("herdr-core.ui.layout")
+    local original = vim.api.nvim_get_current_tabpage()
+    local buffers = {}
+    ---@param address string
+    ---@return integer
+    local function buffer_for(address)
+        if not buffers[address] then
+            local buffer = vim.api.nvim_create_buf(false, true)
+            vim.b[buffer].herdr_core_address = address
+            buffers[address] = buffer
+        end
+        return buffers[address]
+    end
+    local value = { tabs = { { id = "tab", root = { kind = "terminal", id = "window", terminal = "t1" } } } }
+    layout.show(value, buffer_for)
+    local window = assert(vim.fn.win_findbuf(buffer_for("t1"))[1])
+    local file = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_win_set_buf(window, file)
+    -- When the layout is shown again and the file window then shows another terminal
+    layout.show(value, buffer_for)
+    vim.api.nvim_win_set_buf(window, buffer_for("t2"))
+    local actual = layout.read()
+    for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
+        if tab ~= original then
+            vim.api.nvim_set_current_tabpage(tab)
+            vim.cmd.tabclose()
+        end
+    end
+    for _, buffer in pairs(buffers) do
+        vim.api.nvim_buf_delete(buffer, { force = true })
+    end
+    vim.api.nvim_buf_delete(file, { force = true })
+    -- Then the two terminal windows have different ids
+    local children = assert(assert(actual.tabs[1]).root.children)
+    MiniTest.expect.no_equality(assert(children[1]).id, assert(children[2]).id)
+end
+
 return T
