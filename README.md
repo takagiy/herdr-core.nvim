@@ -6,18 +6,25 @@ A TUI client for [herdr-core](https://github.com/herdrdev/herdr-core), built on 
 
 ## Features
 
-- A sidebar groups sessions into spaces by Git repository or working directory, and shows each agent's status icon.
+- A sidebar groups sessions into spaces by Git repository or working directory, automatically tracking `cd`.
+- Shows each agent's status icon in the sidebar.
 - Sends OS notifications when an agent needs you or finishes.
 - Restores terminal layouts when Neovim restarts.
 - Automatically resumes agent conversations after a reboot.
+- Built-in integrations for Claude Code, Codex, Antigravity CLI, Copilot CLI, Cursor CLI, Droid, Grok, Kilo Code, Mastra Code, omp, opencode, pi, Qoder CLI and Qwen Code. You can [write your own](#custom-integrations).
 
 ## Usage
 
-- Press `j`/`k` or `Up`/`Down` to move between items, and Enter or click to use one.
-- Use New terminal to start a terminal session in the Neovim folder, your home folder or a space.
-- On a space's or terminal session's row, press `n` to start a terminal session in that space.
-- On a terminal session's row, press Enter or click to open it, `r` to name it, `p` to pin it, or `u` to mark it unread.
-- Click `«` at the bottom right to collapse the sidebar, or `»` to expand it.
+| Input | Action |
+| --- | --- |
+| `j`, `k` / `Up`, `Down` | Move selection |
+| Select terminal session and press `Enter` / Click it | Open it |
+| Select `New terminal` and press `Enter` / Click it | Start a terminal session in a space you pick |
+| Select terminal session and press `n` | Start a terminal session in its space |
+| Select terminal session and press `r` | Name it |
+| Select terminal session and press `p` | Pin it |
+| Select terminal session and press `u` | Mark it unread |
+| Select `«` or `»` and press `Enter` / Click it | Toggle the sidebar |
 
 ## Requirements
 
@@ -126,11 +133,18 @@ local integrations = require("herdr-core.integrations")
 
 -- For directory: the folder named by the variable, or path when the variable is unset.
 integrations.directory({ env = "MYAGENT_HOME", path = "~/.myagent" })
--- For install: adds the hooks to a JSON settings file, in this shape:
--- { "hooks": { "<event>": [{ "hooks": [{ "type": "command", "command": "<hook command>" }] }] } }
-integrations.hooks({ file = "settings.json", events = { started = "SessionStart", ended = "SessionEnd" } })
+-- For install: sets or appends a value at a key in a JSON or JSONC settings file.
+integrations.json({
+    file = "hooks.json",
+    events = { started = "SessionStart", ended = "SessionEnd" },
+    append = { ["hooks.{{event}}"] = { type = "command", command = "{{command}}" } },
+    set = { version = 1 },
+})
 -- For install: sets keys in a TOML settings file.
 integrations.toml({ file = "config.toml", set = { ["features.hooks"] = true } })
+-- For install: writes a file from a template, such as an extension the agent loads.
+-- {{start_command}} and {{end_command}} become the hook commands.
+integrations.template({ path = "extensions/herdr.js", source = vim.fn.expand("~/herdr-template.js") })
 -- For matches_program: also recognizes programs run through node, npx and other interpreters.
 integrations.program({ "myagent" })
 ```
