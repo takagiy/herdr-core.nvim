@@ -2,57 +2,32 @@
 
 A TUI client for [herdr-core](https://github.com/herdrdev/herdr-core), built on Neovim.
 
+## Features
+
+- A sidebar groups sessions into spaces by Git repository or working directory, and shows each agent's status icon.
+- Sends OS notifications when an agent needs you or finishes.
+- Restores terminal layouts when Neovim restarts.
+- Automatically resumes agent conversations after a reboot.
+
+## Usage
+
+- Press `j`/`k` or `Up`/`Down` to move between items, and Enter or click to use one.
+- Use New terminal to start a terminal session in the Neovim folder, your home folder or a space.
+- On a space's or terminal session's row, press `n` to start a terminal session in that space.
+- On a terminal session's row, press Enter or click to open it, `r` to name it, `p` to pin it, or `u` to mark it unread.
+- Click `«` at the bottom right to collapse the sidebar, or `»` to expand it.
+
 ## Requirements
 
 - Neovim 0.11 or later
 - `hc` on your PATH
 - Git
 
-## Usage
-
-The sidebar groups terminal sessions into spaces by Git repository root, or by working directory outside a repository.
-
-- Press `j`/`k` or `Up`/`Down` to move between items.
-- On a space's row, press `n` or click `+` to start a terminal session there.
-- On a terminal session's row, press Enter or click to open it.
-- On a terminal session's row, press `r` to name it, `p` to pin it, or `u` to mark it unread.
-- Click `«` at the bottom right to collapse the sidebar, or `»` to expand it.
-
-Closing a terminal window leaves its session running in herdr-core. Terminal layouts are restored when Neovim restarts and synchronized between Neovim instances.
-
-## Restoring after a reboot
-
-Terminals opened from the plugin come back after a reboot as shells in the same place. Agent conversations come back too, once the agent's integration is installed: when Claude Code or Codex is set up on this machine, the sidebar shows a Setup panel to install it.
-
-The integration adds a hook to the agent's settings (`~/.claude/settings.json`, or `~/.codex/hooks.json` and `config.toml`). The hook labels its hc terminal with `herdr-core-nvim.agent` (the integration's name) and `herdr-core-nvim.session` (the conversation id), and clears both when the conversation ends. When Neovim starts and finds those labels on a terminal whose agent no longer runs, it types the integration's resume command there.
-
-To change a built-in integration or add one, pass `integrations` to `setup`. Fields you give replace the built-in ones; `false` turns one off.
-
-```lua
-local integrations = require("herdr-core.integrations")
-require("herdr-core").setup({
-    integrations = {
-        claude = { resume_command = function(id) return "claude --resume " .. id .. " --model opus" end },
-        codex = false,
-        mycli = {
-            directory = integrations.directory({ env = "MYCLI_HOME", path = "~/.mycli" }),
-            install = {
-                integrations.hooks({ file = "settings.json", events = { started = "SessionStart", ended = "SessionEnd" } }),
-            },
-            resume_command = function(id) return "mycli --resume " .. id end,
-            matches_program = integrations.program({ "mycli" }),
-        },
-    },
-})
-```
-
-See [docs/adr/integrations.md](docs/adr/integrations.md) for the helpers and the hook script's arguments.
-
-## Installation
+## Installation and configuration
 
 With lazy.nvim:
 
-The plugin maps no global keys. This example uses the default sidebar settings.
+The plugin maps no global keys.
 
 ```lua
 {
@@ -72,6 +47,16 @@ The plugin maps no global keys. This example uses the default sidebar settings.
                 pin = "p",
                 unread = "u",
             },
+            -- Custom how notifications are sent.
+            notify = function(name, status)
+                ...
+            end,
+            -- Custom picker UI.
+            picker = function(items, options, on_choice)
+                ...
+            end,
+            -- Custom agent integrations. See Custom integrations below.
+            integrations = {},
         })
         if not app.actions then return end
         vim.keymap.set({ "n", "t" }, "<leader>ht", app.actions.new_tab)
@@ -83,4 +68,67 @@ The plugin maps no global keys. This example uses the default sidebar settings.
 }
 ```
 
-Notifications use your OS notification service by default.
+### Custom integrations
+
+```lua
+integrations = {
+    -- Turns off a built-in integration.
+    codex = false,
+    -- Overrides part of a built-in integration.
+    claude = {
+        resume_command = function(id)
+            return "claude --resume " .. id .. " --model opus"
+        end,
+    },
+    -- Adds an agent.
+    myagent = {
+        -- Finds the agent's settings folder.
+        -- Returns its path, or nil when the agent is not installed.
+        directory = function()
+            local path = vim.fs.normalize("~/.myagent")
+            return vim.fn.isdirectory(path) == 1 and path or nil
+        end,
+        install = {
+            {
+                -- Checks the hooks are installed.
+                -- Returns "installed", "outdated" or "missing".
+                check = function(context)
+                    local file = context.directory .. "/hooks.txt"
+                    if vim.fn.filereadable(file) == 0 then return "missing" end
+                    local wanted = { context.hook_command("started"), context.hook_command("ended") }
+                    return vim.deep_equal(vim.fn.readfile(file), wanted) and "installed" or "outdated"
+                end,
+                -- Installs the hooks.
+                apply = function(context)
+                    local hooks = { context.hook_command("started"), context.hook_command("ended") }
+                    vim.fn.writefile(hooks, context.directory .. "/hooks.txt")
+                end,
+            },
+        },
+        -- Builds the command that resumes a conversation.
+        resume_command = function(id)
+            return "myagent --resume " .. id
+        end,
+        -- Checks the terminal's program is this agent.
+        matches_program = function(program)
+            return program.name == "myagent" or (program.argv or {})[1] == "myagent"
+        end,
+    },
+},
+```
+
+You can use these helpers to write an integration:
+
+```lua
+local integrations = require("herdr-core.integrations")
+
+-- For directory: the folder named by the variable, or path when the variable is unset.
+integrations.directory({ env = "MYAGENT_HOME", path = "~/.myagent" })
+-- For install: adds the hooks to a JSON settings file, in this shape:
+-- { "hooks": { "<event>": [{ "hooks": [{ "type": "command", "command": "<hook command>" }] }] } }
+integrations.hooks({ file = "settings.json", events = { started = "SessionStart", ended = "SessionEnd" } })
+-- For install: sets keys in a TOML settings file.
+integrations.toml({ file = "config.toml", set = { ["features.hooks"] = true } })
+-- For matches_program: also recognizes programs run through node, npx and other interpreters.
+integrations.program({ "myagent" })
+```
