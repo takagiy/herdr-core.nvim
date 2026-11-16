@@ -2,8 +2,8 @@ local M = {}
 
 local symbols = { working = "◐", blocked = "●", error = "✗", done = "✓", idle = "○" }
 
--- Labels on the left of the Setup panel take this many columns; buttons start after them.
-local label_width = 12
+-- Labels on the left of the Setup panel take this many columns, the last one a gap; buttons start after them.
+local label_width = 13
 
 ---@param text  string
 ---@param width integer
@@ -36,7 +36,7 @@ local function setup_box(rows, width)
         local left = indent .. (row.lines[1] or "")
         local line = { row = row }
         if row.button then
-            left = fit(left, label_width)
+            left = fit(left, label_width - 1) .. " "
             local button = " " .. row.button .. " "
             line.text = " │" .. left .. fit(button, inner - label_width) .. "│"
             line.button_start = #(" │" .. left)
@@ -44,7 +44,7 @@ local function setup_box(rows, width)
             line.group = row.kind == "setup_heading" and "HerdrCoreHeader" or nil
         else
             line.text = " │" .. fit(left, inner) .. "│"
-            line.group = "HerdrCoreMuted"
+            line.group = row.kind == "setup_heading" and "HerdrCoreHeader" or "HerdrCoreMuted"
         end
         lines[#lines + 1] = line
     end

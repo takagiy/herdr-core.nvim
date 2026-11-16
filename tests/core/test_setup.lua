@@ -27,14 +27,14 @@ T["shows integrations that need setting up under one heading"] = function ()
     -- Then the heading offers both, the outdated one updates and the installed one is hidden
     MiniTest.expect.equality(shown(rows), {
         { "setup_heading", "Integration", "Install all" },
-        { "setup_button", "", "Not now" },
         { "setup_text", "Supported agents detected.", "" },
         { "setup_item", "claude", "Install" },
-        { "setup_item", "codex", "Update" }
+        { "setup_item", "codex", "Update" },
+        { "setup_button", "", "Dismiss" }
     })
 end
 
-T["puts Not now on the heading when only one integration is left"] = function ()
+T["leaves Install all out when only one integration is left"] = function ()
     -- Given one agent to set up
     local current = setup.update(setup.new(), {
         type = "setup_checked",
@@ -42,8 +42,9 @@ T["puts Not now on the heading when only one integration is left"] = function ()
     })
     -- When the panel is viewed
     local rows = setup.view(current)
-    -- Then there is no Install all
-    MiniTest.expect.equality(shown(rows)[1], { "setup_heading", "Integration", "Not now" })
+    -- Then the heading has no button and Dismiss stays at the bottom
+    MiniTest.expect.equality(shown(rows)[1], { "setup_heading", "Integration", "" })
+    MiniTest.expect.equality(shown(rows)[#rows], { "setup_button", "", "Dismiss" })
 end
 
 T["installs the requested or every pending integration"] = function ()
@@ -71,17 +72,17 @@ T["explains a failed install and hides finished ones"] = function ()
     -- Then claude offers a retry with the reason, and codex is gone
     local rows = shown(setup.view(current))
     MiniTest.expect.equality({ rows[1], rows[3], rows[4] }, {
-        { "setup_heading", "Integration", "Not now" },
+        { "setup_heading", "Integration", "" },
         { "setup_item", "claude", "Retry" },
         { "setup_error", "! settings.json is not JSON", "" }
     })
 end
 
-T["hides a dismissed heading until Neovim restarts"] = function ()
+T["hides the dismissed panel until Neovim restarts"] = function ()
     -- Given the core with pending agents
     local current = state.update(state.new(), two)
-    -- When the heading is dismissed
-    current = state.update(current, { type = "setup_dismissed", group = "integration" })
+    -- When the panel is dismissed
+    current = state.update(current, { type = "setup_dismissed" })
     -- Then the view has no setup rows
     local _, rows = state.view(current)
     MiniTest.expect.equality(vim.tbl_filter(function (row) return row.kind:find("^setup") ~= nil end, rows), {})

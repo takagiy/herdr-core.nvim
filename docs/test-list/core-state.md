@@ -25,4 +25,4 @@ The core's single entry point.
 - [x] When a saved layout loads before the terminal list, `update` can keep every terminal in it.
 - [x] When a later layout names a terminal whose start event has not arrived yet, `update` can keep that terminal.
 - [x] When the terminal list arrives or a terminal restarts, `update` can ask to resume each left conversation once, and again after its labels clear.
-- [x] When the user dismisses a Setup heading, `view` can leave out its rows until Neovim restarts.
+- [x] When the user dismisses the Setup panel, `view` can leave out its rows until Neovim restarts.

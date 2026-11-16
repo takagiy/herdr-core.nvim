@@ -88,7 +88,7 @@ function M.setup(config)
             elseif row.action == "install_all" then
                 dispatch({ type = "setup_requested" })
             elseif row.action == "dismiss" then
-                dispatch({ type = "setup_dismissed", group = row.group })
+                dispatch({ type = "setup_dismissed" })
             end
             return
         end

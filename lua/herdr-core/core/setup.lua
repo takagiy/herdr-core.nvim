@@ -8,7 +8,7 @@ local M = {}
 
 ---@class HerdrCoreSetupState
 ---@field items     HerdrCoreSetupItem[]
----@field dismissed table<string, boolean>
+---@field dismissed boolean              Hidden until Neovim restarts.
 
 ---@class HerdrCoreSetupChecked
 ---@field type  'setup_checked'
@@ -25,8 +25,7 @@ local M = {}
 ---@field error? string
 
 ---@class HerdrCoreSetupDismissed
----@field type  'setup_dismissed'
----@field group string
+---@field type 'setup_dismissed'
 
 ---@class HerdrCoreInstallEffect
 ---@field type  'install_integrations'
@@ -34,7 +33,7 @@ local M = {}
 
 ---@return HerdrCoreSetupState
 function M.new()
-    return { items = {}, dismissed = {} }
+    return { items = {}, dismissed = false }
 end
 
 ---@param state HerdrCoreSetupState
@@ -64,9 +63,7 @@ function M.update(state, event)
         end, state.items)
         return { items = items, dismissed = state.dismissed }, {}
     end
-    local dismissed = vim.deepcopy(state.dismissed)
-    dismissed[event.group] = true
-    return { items = state.items, dismissed = dismissed }, {}
+    return { items = state.items, dismissed = true }, {}
 end
 
 -- The rows of the Setup panel; empty when nothing needs setting up.
@@ -74,34 +71,18 @@ end
 ---@return HerdrCoreSidebarRow[]
 function M.view(state)
     local items = pending(state)
-    if #items == 0 or state.dismissed.integration then return {} end
+    if #items == 0 or state.dismissed then return {} end
     local group = "integration"
     ---@type HerdrCoreSidebarRow[]
-    local rows = {}
-    if #items > 1 then
-        rows[#rows + 1] = {
+    local rows = {
+        {
             kind = "setup_heading",
             group = group,
             lines = { "Integration" },
-            button = "Install all",
-            action = "install_all"
+            button = #items > 1 and "Install all" or nil,
+            action = #items > 1 and "install_all" or nil
         }
-        rows[#rows + 1] = {
-            kind = "setup_button",
-            group = group,
-            lines = { "" },
-            button = "Not now",
-            action = "dismiss"
-        }
-    else
-        rows[#rows + 1] = {
-            kind = "setup_heading",
-            group = group,
-            lines = { "Integration" },
-            button = "Not now",
-            action = "dismiss"
-        }
-    end
+    }
     rows[#rows + 1] = { kind = "setup_text", group = group, lines = { "Supported agents detected." } }
     for _, item in ipairs(items) do
         rows[#rows + 1] = {
@@ -116,6 +97,7 @@ function M.view(state)
             rows[#rows + 1] = { kind = "setup_error", group = group, lines = { "! " .. item.error } }
         end
     end
+    rows[#rows + 1] = { kind = "setup_button", lines = { "" }, button = "Dismiss", action = "dismiss" }
     return rows
 end
 

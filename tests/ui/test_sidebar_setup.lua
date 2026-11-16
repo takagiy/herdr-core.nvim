@@ -12,7 +12,6 @@ local rows = {
         button = "Install all",
         action = "install_all"
     },
-    { kind = "setup_button", group = "integration", lines = { "" }, button = "Not now", action = "dismiss" },
     { kind = "setup_text", group = "integration", lines = { "Supported agents detected." } },
     {
         kind = "setup_item",
@@ -22,7 +21,8 @@ local rows = {
         button = "Install",
         action = "install"
     },
-    { kind = "setup_error", group = "integration", lines = { "! settings.json is not JSON" } }
+    { kind = "setup_error", group = "integration", lines = { "! settings.json is not JSON" } },
+    { kind = "setup_button", lines = { "" }, button = "Dismiss", action = "dismiss" }
 }
 
 ---@param buffer integer
@@ -48,14 +48,16 @@ T["draws the Setup panel above the toggle with aligned buttons"] = function ()
     sidebar.close()
     -- Then the box ends just above the toggle and its buttons start in one column
     local count = #lines
-    MiniTest.expect.equality(lines[count - 1], " ╰" .. string.rep("─", 28) .. "╯")
     MiniTest.expect.equality(lines[count - 7], " ╭ Setup " .. string.rep("─", 21) .. "╮")
-    MiniTest.expect.equality({ lines[count - 6], lines[count - 5] }, {
-        " │ Integration Install all    │",
-        " │             Not now        │"
+    local panel = { lines[count - 6], lines[count - 5], lines[count - 4], lines[count - 3], lines[count - 2] }
+    MiniTest.expect.equality(panel, {
+        " │ Integration  Install all   │",
+        " │ Supported agents detected. │",
+        " │  claude      Install       │",
+        " │  ! settings.json is not JSO│",
+        " │              Dismiss       │"
     })
-    MiniTest.expect.equality(lines[count - 3], " │  claude     Install        │")
-    MiniTest.expect.equality(lines[count - 2], " │  ! settings.json is not JSO│")
+    MiniTest.expect.equality(lines[count - 1], " ╰" .. string.rep("─", 28) .. "╯")
     MiniTest.expect.equality(#buttons, 3)
     MiniTest.expect.equality(vim.fn.strdisplaywidth(assert(lines[count - 7])), 31)
 end
@@ -70,8 +72,8 @@ T["moves onto Setup buttons and presses the one under the cursor"] = function ()
     sidebar.render(rows, 0)
     vim.api.nvim_set_current_win(window)
     vim.api.nvim_win_set_cursor(window, { 3, 0 })
-    -- When the user moves down three times and presses Enter
-    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("jjj<CR>", true, false, true), "x", false)
+    -- When the user moves down twice and presses Enter
+    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("jj<CR>", true, false, true), "x", false)
     vim.api.nvim_exec_autocmds("CursorMoved", { buffer = sidebar.buffer })
     local line = vim.api.nvim_win_get_cursor(window)[1]
     local active = lines_with(sidebar.buffer, "HerdrCoreButtonActive")
