@@ -21,7 +21,7 @@ local T = MiniTest.new_set({
 
 ---@param key? string
 local function press_mouse(key)
-    local raw = vim.api.nvim_replace_termcodes(key or "<LeftMouse>", true, false, true)
+    local raw = vim.api.nvim_replace_termcodes(key or "<LeftRelease>", true, false, true)
     assert(mouse_listener)(raw, raw)
     local done = false
     vim.schedule(function () done = true end)
@@ -386,7 +386,7 @@ T["treats a quick second click like the first"] = function ()
     vim.fn.getmousepos = function () return { winid = window, line = 3, column = 1 } end
     press_mouse()
     -- When the second click arrives as a double click
-    press_mouse("<2-LeftMouse>")
+    press_mouse("<2-LeftRelease>")
     vim.fn.getmousepos = getmousepos
     sidebar.close()
     -- Then both clicks activate the terminal
@@ -582,14 +582,14 @@ T["selects the row under the cursor beside the terminal in front"] = function ()
     local on_t2 = { ranges(sidebar.buffer, "HerdrCoreSelected"), ranges(sidebar.buffer, "HerdrCoreActive") }
     vim.api.nvim_win_set_cursor(window, { 2, 0 })
     sidebar.render(rows, 0)
-    local on_button = ranges(sidebar.buffer, "HerdrCoreButtonActive")
+    local on_button = { ranges(sidebar.buffer, "HerdrCoreButtonActive"), ranges(sidebar.buffer, "HerdrCoreSelected") }
     sidebar.close()
     vim.api.nvim_set_current_buf(original)
     vim.api.nvim_buf_delete(front, { force = true })
-    -- Then only the cursor row is selected, t1 keeps its gray, and a selected button takes the accent
+    -- Then only the cursor row is selected, t1 keeps its gray, and on a button row only the button takes the accent
     MiniTest.expect.equality(outside, {})
     MiniTest.expect.equality(on_t2, { { { 4, 6 } }, { { 2, 4 } } })
-    MiniTest.expect.equality(on_button, { { 1, 1 } })
+    MiniTest.expect.equality(on_button, { { { 1, 1 } }, {} })
 end
 
 T["gives every button the same background"] = function ()
