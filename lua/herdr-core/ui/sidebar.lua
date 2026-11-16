@@ -136,10 +136,11 @@ function M.create(on_action, keys)
     )
     ---@type table<string, boolean>
     local clicks = {}
-    for _, key in ipairs({ "<LeftMouse>", "<2-LeftMouse>", "<3-LeftMouse>", "<4-LeftMouse>" }) do
+    for _, key in ipairs({ "<LeftRelease>", "<2-LeftRelease>", "<3-LeftRelease>", "<4-LeftRelease>" }) do
         clicks[vim.api.nvim_replace_termcodes(key, true, false, true)] = true
     end
-    -- Observe native clicks so focus can move both into and out of the sidebar.
+    -- Observe native clicks so focus can move both into and out of the sidebar. Acting on the release lets a
+    -- window opened by the action, such as the place picker, keep the focus the click would otherwise take back.
     vim.on_key(function (key)
         if not clicks[key] then return end
         local mouse = vim.fn.getmousepos()
@@ -339,8 +340,10 @@ function M.create(on_action, keys)
         -- The space holding the terminal in front takes the accent.
         local owner = front and space_of[front.first]
         if owner and owner > 0 then assert(marks[owner]).group = "HerdrCoreSpaceActive" end
+        local on_button = false
         for _, button in ipairs(buttons) do
             local chosen = selected and button.line >= selected.first and button.line <= selected.last
+            on_button = on_button or chosen == true
             marks[#marks + 1] = {
                 row = button.line - 1,
                 group = chosen and "HerdrCoreButtonActive" or "HerdrCoreButton",
@@ -359,7 +362,9 @@ function M.create(on_action, keys)
             })
         end
         -- Gray marks the terminal in front, the accent the row under the cursor, which wins on the same row.
-        for _, range in ipairs({ { front, "HerdrCoreActive", 90 }, { selected, "HerdrCoreSelected", 95 } }) do
+        -- On a row with a button, the button alone shows the selection.
+        local row = not on_button and selected or nil
+        for _, range in ipairs({ { front, "HerdrCoreActive", 90 }, { row, "HerdrCoreSelected", 95 } }) do
             if range[1] then
                 vim.api.nvim_buf_set_extmark(buffer, namespace, range[1].first - 1, 0, {
                     end_row = range[1].last,

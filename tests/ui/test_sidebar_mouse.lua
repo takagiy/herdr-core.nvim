@@ -91,6 +91,29 @@ T["presses New terminal with one click from another window"] = function ()
     MiniTest.expect.equality(child.lua_get("actions"), { { "new_terminal" } })
 end
 
+T["keeps the picker open after a click on New terminal"] = function ()
+    -- Given New terminal opening the place picker
+    child.lua(
+        [[
+        sidebar.close()
+        sidebar = require('herdr-core.ui.sidebar').create(function (action)
+            if action ~= 'new_terminal' then return end
+            require('herdr-core.ui.prompt').choose({ { label = '~', path = '~' } }, {}, function (item)
+                picked = item or false
+            end)
+        end)
+        side = sidebar.show(32)
+        sidebar.render({}, 0)
+        vim.api.nvim_set_current_win(editor)
+    ]]
+    )
+    -- When New terminal is clicked from the editor
+    click(child.lua_get("side"), 2, 3)
+    -- Then the picker is still open and focused, with nothing chosen yet
+    MiniTest.expect.equality(child.lua_get("picked"), vim.NIL)
+    MiniTest.expect.equality(child.lua_get("vim.api.nvim_win_get_config(0).relative"), "editor")
+end
+
 T["keeps the footer toggle at the right edge when resized and collapsed"] = function ()
     -- Given a sidebar resized from its configured width
     local side = child.lua_get("side")
