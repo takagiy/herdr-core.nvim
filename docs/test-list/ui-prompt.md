@@ -8,3 +8,4 @@ Asking the user for input.
 - [x] When asked to choose, `choose` can list the items in a floating window centered in the editor, with the row under the cursor selected.
 - [x] When the user presses Enter or clicks an item, `choose` can return that item.
 - [x] When the user presses Esc or `q`, or leaves the window, `choose` can return nil.
+- [x] When an item is wider than the editor, `choose` can shorten it from the left with `…`, so every item keeps one row.

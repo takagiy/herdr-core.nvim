@@ -49,9 +49,8 @@ end
 
 ---@type HerdrCoreChoice[]
 local places = {
-    { label = "app", detail = "Neovim folder", path = "/work/app" },
-    { label = "takag", detail = "Home", path = "/home/takag" },
-    { label = "api", detail = "/work/api", path = "/work/api" }
+    { label = "/work/app", path = "/work/app" }, { label = "~", path = "/home/takag" },
+    { label = "/work/api", path = "/work/api" }
 }
 
 ---@param keys string
@@ -115,6 +114,26 @@ T["returns nil when the user closes or leaves the list"] = function ()
     -- Then each reports no choice, and no list is left open
     MiniTest.expect.equality(results, { false, false, false })
     MiniTest.expect.equality(#vim.api.nvim_list_wins(), 1)
+end
+
+T["shortens items wider than the editor from the left"] = function ()
+    -- Given an editor 50 columns wide and a path longer than that
+    vim.o.columns, vim.o.lines = 50, 12
+    local long = "~/Codes/very/long/path/to/some/deeply/nested/project/folder"
+    -- When the user is asked to choose
+    local prompt = require("herdr-core.ui.prompt")
+    local items = { { label = long, path = long }, { label = "~", path = "~" } }
+    prompt.choose(items, {}, function () end)
+    local window = vim.api.nvim_get_current_win()
+    local width = vim.api.nvim_win_get_width(window)
+    local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+    local wrap = vim.wo[window].wrap
+    press("<Esc>")
+    -- Then the window fits the editor, the path keeps its end after an ellipsis, and nothing wraps
+    MiniTest.expect.equality(width <= 48, true)
+    MiniTest.expect.equality(vim.fn.strdisplaywidth(assert(lines[1])) <= width, true)
+    MiniTest.expect.equality(assert(lines[1]):match("^ ….*project/folder $") ~= nil, true)
+    MiniTest.expect.equality({ lines[2], wrap }, { " ~ ", false })
 end
 
 return T

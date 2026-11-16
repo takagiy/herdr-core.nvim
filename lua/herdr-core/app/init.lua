@@ -125,23 +125,22 @@ function M.setup(config)
             if row.kind == "new_terminal" then
                 ---@type HerdrCoreChoice[]
                 local places = {}
-                ---@param path   string
-                ---@param detail string
-                local function offer(path, detail)
+                ---@param path string
+                local function offer(path)
                     path = vim.fs.normalize(path)
                     for _, place in ipairs(places) do
                         if place.path == path then return end
                     end
-                    places[#places + 1] = { label = vim.fs.basename(path), detail = detail, path = path }
+                    places[#places + 1] = { label = vim.fn.fnamemodify(path, ":~"), path = path }
                 end
-                offer(vim.fn.getcwd(), "Neovim folder")
+                offer(vim.fn.getcwd())
                 local home = vim.fn.expand("~") --[[@as string]]
-                offer(home, "Home")
+                offer(home)
                 local _, rows = core.view(loop.state())
                 for _, space in ipairs(rows) do
                     -- A shell starts on this machine, so other machines' spaces are left out.
                     if space.kind == "space" and space.root and not space.machine then
-                        offer(space.root, vim.fn.fnamemodify(space.root, ":~"))
+                        offer(space.root)
                     end
                 end
                 local picker = config.picker or require("herdr-core.ui.prompt").choose
