@@ -270,6 +270,7 @@ T["offers the Neovim folder, home and this machine's spaces for a new terminal"]
     child.lua(
         [[require('herdr-core').setup({ auto_insert = false, picker = function (items, options, on_choice)
         requests.places = vim.tbl_map(function (item) return item.path end, items)
+        requests.labels = vim.tbl_map(function (item) return item.label end, items)
         requests.prompt = options.prompt
         on_choice(items[#items])
     end })]]
@@ -289,6 +290,11 @@ T["offers the Neovim folder, home and this machine's spaces for a new terminal"]
     end)()]]
     )
     MiniTest.expect.equality(child.lua_get("requests.places"), expected)
+    -- Each place shows as its path, shortened under home
+    local shown = child.lua_get(
+        "vim.tbl_map(function (path) return vim.fn.fnamemodify(path, ':~') end, ...)", { expected }
+    )
+    MiniTest.expect.equality(child.lua_get("requests.labels"), shown)
     MiniTest.expect.equality(child.lua_get("requests.prompt"), "New terminal")
     MiniTest.expect.equality(child.lua_get("requests.run.folder"), "/app")
 end

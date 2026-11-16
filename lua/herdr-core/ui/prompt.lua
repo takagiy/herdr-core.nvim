@@ -7,9 +7,8 @@ function M.name(current, callback)
 end
 
 ---@class HerdrCoreChoice
----@field label   string
----@field detail? string Shown dimmed after the label.
----@field path    string
+---@field label string
+---@field path  string
 
 -- Takes the arguments of vim.ui.select, so that vim.ui.select can stand in for it.
 -- A floating window centered in the editor; the row under the cursor is selected, as in the sidebar.
@@ -18,23 +17,24 @@ end
 ---@param on_choice fun(item: HerdrCoreChoice?) Called once, with nil when the window closes without a choice.
 function M.choose(items, options, on_choice)
     local title = options.prompt or ""
-    local lines, width = {}, vim.fn.strdisplaywidth(title) + 4
+    local width = vim.fn.strdisplaywidth(title) + 4
     for _, item in ipairs(items) do
-        lines[#lines + 1] = " " .. item.label .. (item.detail and "  " .. item.detail or "") .. " "
-        width = math.max(width, vim.fn.strdisplaywidth(lines[#lines]))
+        width = math.max(width, vim.fn.strdisplaywidth(item.label) + 2)
+    end
+    -- The border takes a column on each side.
+    width = math.min(width, math.max(1, vim.o.columns - 2))
+    local lines = {}
+    for _, item in ipairs(items) do
+        local label = item.label
+        -- A path tells folders apart by its end, so a long one loses its start.
+        while vim.fn.strdisplaywidth(label) > width - 2 and vim.fn.strchars(label) > 1 do
+            label = "…" .. vim.fn.strcharpart(label, 2)
+        end
+        lines[#lines + 1] = " " .. label .. " "
     end
     local buffer = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_lines(buffer, 0, -1, false, lines)
     vim.bo[buffer].modifiable, vim.bo[buffer].bufhidden = false, "wipe"
-    local namespace = vim.api.nvim_create_namespace("HerdrCoreChoose")
-    for index, item in ipairs(items) do
-        if item.detail then
-            vim.api.nvim_buf_set_extmark(buffer, namespace, index - 1, #(" " .. item.label .. "  "), {
-                end_col = #(" " .. item.label .. "  " .. item.detail),
-                hl_group = "HerdrCoreMuted"
-            })
-        end
-    end
     local height = math.max(1, #lines)
     local window = vim.api.nvim_open_win(buffer, true, {
         relative = "editor",
@@ -47,7 +47,7 @@ function M.choose(items, options, on_choice)
         title = title ~= "" and " " .. title .. " " or nil,
         title_pos = title ~= "" and "center" or nil
     })
-    vim.wo[window].cursorline = true
+    vim.wo[window].cursorline, vim.wo[window].wrap = true, false
     vim.wo[window].winhighlight = "NormalFloat:Normal,FloatBorder:HerdrCoreMuted,CursorLine:HerdrCoreSelected"
     local done = false
     ---@param item HerdrCoreChoice?
