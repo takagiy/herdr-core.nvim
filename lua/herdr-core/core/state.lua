@@ -23,6 +23,8 @@ local M = {}
 ---@field read      table<string, integer>
 ---@field open?     fun(terminal: string): HerdrCoreOpenEffect
 ---@field folded    table<string, true>
+---@field listed?   boolean                                    Whether the terminal list from the core has arrived.
+---@field restored? boolean                                    Whether the saved layout has been restored with that list.
 ---@field sidebar?  HerdrCoreSidebarState
 
 ---@class HerdrCoreMachineToggled
@@ -124,8 +126,11 @@ function M.update(state, event)
         return with(state, { focused = event.focused, shown = event.terminals, read = read }), effects
     end
     if event.type == "layout_loaded" or event.type == "layout_changed" or event.type == "layout_conflict" then
-        local next_layout, effects = layout.update(state.layout, event)
-        return with(state, { terminals = state.terminals, spaces = state.spaces, layout = next_layout }), effects
+        -- Only the startup restore drops unknown terminals: a later load can name a terminal whose start event is still on its way.
+        local restoring = event.type == "layout_loaded" and state.listed and not state.restored
+        local loaded = restoring and vim.tbl_extend("force", event, { live = state.terminals }) --[[@as HerdrCoreLayoutLoaded]] or event
+        local next_layout, effects = layout.update(state.layout, loaded)
+        return with(state, { layout = next_layout, restored = state.restored or restoring }), effects
     end
     if event.type == "status_changed" or event.type == "turn_changed" or event.type == "labels_changed"
         or event.type == "terminal_named" or event.type == "terminal_pinned" then
@@ -173,7 +178,7 @@ function M.update(state, event)
                 effects[#effects + 1] = effect
             end
         end
-        return with(state, { terminals = next_terminals, spaces = state.spaces, layout = state.layout }), effects
+        return with(state, { terminals = next_terminals, listed = true }), effects
     end
     if event.type == "foreground_changed" then
         local next_terminals = terminals.update(state.terminals, event)
@@ -216,9 +221,10 @@ end
 function M.view(state)
     local list = vim.tbl_values(state.terminals)
     local order, rows = sidebar.update(state.sidebar, list, { folded = state.folded })
+    -- Count from the terminals, not the rows: a folded machine hides its rows.
     local waiting = 0
-    for _, row in ipairs(rows) do
-        if row.kind == "space" then waiting = waiting + (row.waiting or 0) end
+    for _, terminal in ipairs(list) do
+        if attention.display(terminal).waiting then waiting = waiting + 1 end
     end
     return with(state, { sidebar = order }), rows, waiting
 end

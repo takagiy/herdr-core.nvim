@@ -17,8 +17,15 @@ end
 ---@param existing? integer
 ---@return integer
 function M.buffer(terminal, command, existing)
+    ---@type integer?
+    local stale
     for _, buffer in ipairs(vim.api.nvim_list_bufs()) do
-        if vim.b[buffer].herdr_core_address == terminal.address then return buffer end
+        if vim.b[buffer].herdr_core_address == terminal.address then
+            local job = vim.b[buffer].terminal_job_id
+            if not job or vim.fn.jobwait({ job }, 0)[1] == -1 then return buffer end
+            -- Its attach exited; a terminal buffer can't start another, so a new buffer replaces it.
+            stale = buffer
+        end
     end
     local buffer = existing or vim.api.nvim_create_buf(true, false)
     vim.b[buffer].herdr_core_address = terminal.address
@@ -27,6 +34,12 @@ function M.buffer(terminal, command, existing)
             local job = vim.fn.jobstart(command, { term = true })
             if job <= 0 then error("Could not start terminal attach process") end
         end)
+        if stale then
+            for _, window in ipairs(vim.fn.win_findbuf(stale)) do
+                vim.api.nvim_win_set_buf(window, buffer)
+            end
+            vim.api.nvim_buf_delete(stale, { force = true })
+        end
         vim.api.nvim_buf_set_name(buffer, M.name(terminal))
     end)
     if not ok then
