@@ -114,6 +114,26 @@ T["keeps the picker open after a click on New terminal"] = function ()
     MiniTest.expect.equality(child.lua_get("vim.api.nvim_win_get_config(0).relative"), "editor")
 end
 
+T["keeps the sidebar at its left edge when scrolled sideways"] = function ()
+    -- Given a terminal name wider than the sidebar, and the cursor in the editor
+    child.lua(
+        [[
+        sidebar.render({ { kind = 'terminal', address = 't1', lines = { string.rep('long', 20), 'claude' } } }, 0)
+        vim.api.nvim_set_current_win(editor)
+    ]]
+    )
+    local side = child.lua_get("side")
+    local pos = child.fn.screenpos(side, 3, 1)
+    -- When a trackpad scrolls right over the sidebar
+    child.api.nvim_input_mouse("wheel", "right", "", 0, pos.row - 1, pos.col - 1)
+    child.lua("vim.cmd.redraw()")
+    -- Then the sidebar still shows its left edge
+    local leftcol = child.lua_get(
+        "vim.api.nvim_win_call(..., function () return vim.fn.winsaveview().leftcol end)", { side }
+    )
+    MiniTest.expect.equality(leftcol, 0)
+end
+
 T["keeps the footer toggle at the right edge when resized and collapsed"] = function ()
     -- Given a sidebar resized from its configured width
     local side = child.lua_get("side")

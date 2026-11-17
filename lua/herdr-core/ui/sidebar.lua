@@ -214,6 +214,21 @@ function M.create(on_action, keys)
         buffer = buffer,
         callback = function () render(last_rows, last_waiting) end
     })
+    -- A trackpad also scrolls sideways, and the window under the pointer scrolls wherever the cursor is: go back to
+    -- the left edge, since every row starts there.
+    vim.api.nvim_create_autocmd("WinScrolled", {
+        group = group,
+        callback = function ()
+            for id in pairs(vim.v.event) do
+                local window = tonumber(id)
+                if window and vim.api.nvim_win_is_valid(window) and vim.api.nvim_win_get_buf(window) == buffer then
+                    vim.api.nvim_win_call(window, function ()
+                        if vim.fn.winsaveview().leftcol ~= 0 then vim.fn.winrestview({ leftcol = 0 }) end
+                    end)
+                end
+            end
+        end
+    })
     -- Redraw so the toggle stays on the bottom line when the window height changes.
     vim.api.nvim_create_autocmd({ "VimResized", "WinResized" }, {
         group = group,
