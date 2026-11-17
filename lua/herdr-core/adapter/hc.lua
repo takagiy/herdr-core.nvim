@@ -136,7 +136,8 @@ local function terminal(record)
         app = record.status and record.status.app ~= "" and record.status.app or nil,
         turn = integer(record.turn or 0),
         created_ms = integer(record.created_ms),
-        status_ms = record.status_ms and integer(record.status_ms) or nil
+        status_ms = record.status_ms and integer(record.status_ms) or nil,
+        pid = type(record.pid) == "number" and integer(record.pid) or nil
     }
 end
 

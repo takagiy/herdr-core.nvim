@@ -148,7 +148,8 @@ T["converts a terminal list to a core event"] = function ()
                     status_ms = 5,
                     created_ms = 1,
                     turn = 2,
-                    name = "build"
+                    name = "build",
+                    pid = 77
                 }
             }
         }))
@@ -171,7 +172,8 @@ T["converts a terminal list to a core event"] = function ()
                 status = "working",
                 status_ms = 5,
                 created_ms = 1,
-                turn = 2
+                turn = 2,
+                pid = 77
             }
         }
     })

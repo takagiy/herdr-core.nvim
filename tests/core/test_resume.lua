@@ -31,6 +31,18 @@ local function resumable(agent, program)
     return agent == "codex" and program.name ~= "codex"
 end
 
+T["resumes only after the terminal's first process changed"] = function ()
+    -- Given labels written while the terminal's first process was 10, in a terminal still on 10, one restarted as 11,
+    -- and labels from before the process was recorded
+    local labelled = vim.tbl_extend("force", session, { ["herdr-core-nvim.pid"] = "10" })
+    local same, restarted, older = terminal("t1", labelled), terminal("t2", labelled), terminal("t3", session)
+    same.pid, restarted.pid, older.pid = 10, 11, 10
+    -- When terminals are searched
+    local _, effects = resume.find({ same, restarted, older }, {}, resumable)
+    -- Then the agent the user quit in a living shell is left alone
+    MiniTest.expect.equality(vim.tbl_map(function (effect) return effect.terminal end, effects), { "t2", "t3" })
+end
+
 T["resumes a conversation whose agent no longer runs"] = function ()
     -- Given a terminal left with codex labels and a shell in front
     -- When terminals are searched
