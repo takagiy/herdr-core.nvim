@@ -165,8 +165,10 @@ function M.update(previous, terminals, options)
                 state.terminals[terminal.address] = terminal_index
                 state.locations[terminal.address] = root
                 if not machine_folded then
-                    local program = (terminal.program or ""):match([=[[^/\]+$]=]) or ""
-                    program = program:gsub("%.[eE][xX][eE]$", "")
+                    -- The name the command was run by: hc names the file a link points to, such as claude's version.
+                    local command = terminal.argv and terminal.argv[1] or terminal.program or ""
+                    local program = command:match([=[[^/\]+$]=]) or ""
+                    program = program:gsub("^%-+", ""):gsub("%.[eE][xX][eE]$", "")
                     local below = waiting_below(terminal)
                     table.insert(rows, {
                         kind = "terminal",
