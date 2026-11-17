@@ -250,17 +250,19 @@ local function check_node(node, ids)
     end
 end
 
+-- Broken tabs are dropped, so one of them does not keep the others from being restored.
 ---@param value table
+---@return HerdrCoreLayoutValue
 local function check_layout(value)
     assert(type(value) == "table" and type(value.tabs) == "table" and vim.islist(value.tabs), "Invalid layout tabs")
-    local ids = {}
+    local ids, tabs = {}, {}
     for _, tab in ipairs(value.tabs) do
-        assert(
-            type(tab) == "table" and type(tab.id) == "string" and not ids[tab.id], "Invalid or duplicate layout tab id"
-        )
-        ids[tab.id] = true
-        check_node(tab.root, {})
+        if type(tab) == "table" and type(tab.id) == "string" and not ids[tab.id] and pcall(check_node, tab.root, {}) then
+            ids[tab.id] = true
+            tabs[#tabs + 1] = tab
+        end
     end
+    return vim.tbl_extend("force", value, { tabs = tabs }) --[[@as HerdrCoreLayoutValue]]
 end
 
 ---@param callback fun(event: HerdrCoreLayoutLoaded?, err: string?)
@@ -275,14 +277,16 @@ function M.read_layout(callback)
             callback(nil, tostring(version))
             return
         end
-        if result.value then
-            local valid, failure = pcall(check_layout, result.value)
+        local value = result.value
+        if value then
+            local valid, checked = pcall(check_layout, value)
             if not valid then
-                callback(nil, tostring(failure))
+                callback(nil, tostring(checked))
                 return
             end
+            value = checked
         end
-        callback({ type = "layout_loaded", value = result.value, version = version }, nil)
+        callback({ type = "layout_loaded", value = value, version = version }, nil)
     end)
 end
 

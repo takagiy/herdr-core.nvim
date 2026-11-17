@@ -298,6 +298,38 @@ T["reads the shared layout through plain JSON RPC"] = function ()
     MiniTest.expect.equality(event, { type = "layout_loaded", value = value, version = 3 })
 end
 
+T["drops only the broken tabs of a saved layout"] = function ()
+    -- Given a saved layout with a tab whose windows share an id, a sound tab, and a tab repeating its id
+    local sound = { id = "sound", root = { kind = "terminal", id = "w3", terminal = "t3" } }
+    local value = {
+        tabs = {
+            {
+                id = "broken",
+                root = {
+                    kind = "split",
+                    id = "split-w1",
+                    axis = "row",
+                    children = {
+                        { kind = "terminal", id = "w1", terminal = "t1" },
+                        { kind = "terminal", id = "w1", terminal = "t2" }
+                    }
+                }
+            },
+            sound,
+            { id = "sound", root = { kind = "terminal", id = "w4", terminal = "t4" } }
+        }
+    }
+    fake_process(vim.json.encode({ jsonrpc = "2.0", id = 1, result = { value = value, version = 3 } }))
+    ---@type HerdrCoreLayoutLoaded?
+    local event
+    local failure
+    -- When the shared layout is requested
+    require("herdr-core.adapter.hc").read_layout(function (result, err) event, failure = result, err end)
+    -- Then the sound tab is restored instead of the whole layout being refused
+    MiniTest.expect.equality(failure, nil)
+    MiniTest.expect.equality(event, { type = "layout_loaded", value = { tabs = { sound } }, version = 3 })
+end
+
 T["returns a fresh layout after a refused versioned save"] = function ()
     -- Given a doc.set conflict followed by the latest doc.get result
     local latest = { tabs = {} }
@@ -329,7 +361,7 @@ T["returns the saved layout and its new version after a successful write"] = fun
     MiniTest.expect.equality(event, { type = "layout_loaded", value = value, version = 5 })
 end
 
-T["rejects a malformed shared layout without applying it"] = function ()
+T["drops a malformed tab before it reaches window restoration"] = function ()
     -- Given an invalid split in a shared document
     fake_process(vim.json.encode({
             jsonrpc = "2.0",
@@ -359,9 +391,9 @@ T["rejects a malformed shared layout without applying it"] = function ()
         event = value
         failure = err
     end)
-    -- Then it cannot reach the window restoration code
-    MiniTest.expect.equality(event, nil)
-    MiniTest.expect.equality(type(failure), "string")
+    -- Then the tab is gone before the window restoration code sees it
+    MiniTest.expect.equality(event, { type = "layout_loaded", value = { tabs = {} }, version = 2 })
+    MiniTest.expect.equality(failure, nil)
 end
 
 T["converts streamed fact changes even when JSON lines are split"] = function ()
