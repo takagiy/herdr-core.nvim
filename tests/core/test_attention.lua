@@ -115,6 +115,34 @@ T["requests notification when an unseen terminal needs attention"] = function ()
     end
 end
 
+T["shows a child's finished turn as idle and its error as blocked"] = function ()
+    -- Given a child whose turn is unseen, one that failed, and one that is blocked
+    local attention = require("herdr-core.core.attention")
+    -- When their attention states are computed as children
+    local states = {
+        attention.display(terminal("done", 2, "1"), true), attention.display(terminal("error", 1, "1"), true),
+        attention.display(terminal("blocked", 1, "1"), true)
+    }
+    -- Then only the error and the block wait for the user, both shown as blocked
+    MiniTest.expect.equality(states, {
+        { status = "idle", waiting = false },
+        { status = "blocked", waiting = true },
+        { status = "blocked", waiting = true }
+    })
+end
+
+T["notifies about a child only when it needs the user"] = function ()
+    -- Given a working child nobody looks at
+    local attention = require("herdr-core.core.attention")
+    local before = terminal("working", 1, "1")
+    -- When it completes a turn, or becomes blocked instead
+    local finished = attention.notification(before, terminal("done", 2, "1"), true, false, true)
+    local blocked = attention.notification(before, terminal("blocked", 2, "1"), true, false, true)
+    -- Then only the block is notified
+    MiniTest.expect.equality(finished, nil)
+    MiniTest.expect.equality(blocked, { type = "notify", terminal = "t1", name = "t1", status = "blocked" })
+end
+
 T["suppresses notifications for a terminal being watched"] = function ()
     -- Given a visible terminal in a focused editor
     local attention = require("herdr-core.core.attention")

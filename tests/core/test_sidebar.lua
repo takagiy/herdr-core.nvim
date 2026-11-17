@@ -218,6 +218,67 @@ T["folds remote machines without losing the total waiting count"] = function ()
     MiniTest.expect.equality(assert(summary[1]).waiting, 1)
 end
 
+---@param rows HerdrCoreSidebarRow[]
+---@return table[]
+local function tree(rows)
+    return vim.tbl_map(function (row) return { row.root or row.address, row.guide } end, rows)
+end
+
+T["nests children under their parent in the parent's space"] = function ()
+    -- Given a lead with two children in another folder and a grandchild, beside another terminal
+    local sidebar = require("herdr-core.core.sidebar")
+    local terminals = {
+        terminal("t1", "/app", { name = "lead", status_ms = 10 }),
+        terminal("t2", "/work", { parent = "t1", status_ms = 30 }),
+        terminal("t3", "/work", { parent = "t1", status_ms = 20 }),
+        terminal("t4", "/work", { parent = "t2", status_ms = 40 }), terminal("t5", "/app", { status_ms = 5 })
+    }
+    -- When the sidebar is built
+    local _, rows = sidebar.update(nil, terminals)
+    -- Then the children follow their parent in its space, newest first, with tree guides
+    MiniTest.expect.equality(tree(rows), {
+        { "/app" },
+        { "t1" },
+        { "t2", "├ " },
+        { "t4", "│ └ " },
+        { "t3", "└ " },
+        { "t5" }
+    })
+end
+
+T["lists a terminal whose parent is gone as a usual one"] = function ()
+    -- Given a terminal whose parent has ended
+    local sidebar = require("herdr-core.core.sidebar")
+    -- When the sidebar is built
+    local _, rows = sidebar.update(nil, { terminal("t2", "/work", { parent = "t1" }) })
+    -- Then it sits in its own space without a guide
+    MiniTest.expect.equality(tree(rows), { { "/work" }, { "t2" } })
+end
+
+T["counts the children that need the user on their parent and space"] = function ()
+    -- Given a lead with a blocked child, a child whose turn is unseen, and a working child
+    local sidebar = require("herdr-core.core.sidebar")
+    local terminals = {
+        terminal("t1", "/app", { status = "working" }),
+        terminal("t2", "/app", { parent = "t1", status = "blocked" }),
+        terminal("t3", "/app", {
+            parent = "t1",
+            status = "done",
+            turn = 2,
+            labels = { ["herdr.space"] = "/app", ["herdr.seen"] = "1" }
+        }),
+        terminal("t4", "/app", { parent = "t1", status = "working" })
+    }
+    -- When the sidebar is built
+    local _, rows = sidebar.update(nil, terminals)
+    -- Then only the blocked child counts, on the lead and on the space, and the finished child shows idle
+    local by = {}
+    for _, row in ipairs(rows) do
+        by[row.address or row.root] = row
+    end
+    MiniTest.expect.equality({ by["/app"].waiting, by.t1.waiting, by.t3.status }, { 1, 1, "idle" })
+end
+
 T["shows executable basenames without Windows exe suffixes"] = function ()
     -- Given executable paths from Windows and Unix foreground processes
     local sidebar = require("herdr-core.core.sidebar")

@@ -1,5 +1,6 @@
 local M = {}
 local attention = require("herdr-core.core.attention")
+local terminals_module = require("herdr-core.core.terminals")
 
 ---@class HerdrCoreSidebarRow
 ---@field kind      'machine' | 'space' | 'terminal' | 'summary' | 'new_terminal' | 'setup_heading' | 'setup_button' | 'setup_text' | 'setup_item' | 'setup_error'
@@ -10,6 +11,7 @@ local attention = require("herdr-core.core.attention")
 ---@field status    string?
 ---@field lines     string[]
 ---@field waiting   integer?
+---@field guide?    string                                                                                                                                         Tree lines before a child's status, such as "│ └ ".
 ---@field id        string?
 ---@field group?    string                                                                                                                                         The Setup heading a setup row belongs to.
 ---@field name?     string                                                                                                                                         The integration a setup item installs.
@@ -38,12 +40,39 @@ local attention = require("herdr-core.core.attention")
 ---@return HerdrCoreSidebarState, HerdrCoreSidebarRow[]
 function M.update(previous, terminals, options)
     options = options or {}
+    ---@type table<string, HerdrCoreTerminal>
+    local by_address = {}
+    for _, terminal in ipairs(terminals) do
+        by_address[terminal.address] = terminal
+    end
+    ---@param terminal HerdrCoreTerminal
+    ---@return boolean
+    local function child(terminal)
+        return terminals_module.is_child(by_address, terminal)
+    end
+    -- The top of a family: its children share its space.
+    ---@param terminal HerdrCoreTerminal
+    ---@return HerdrCoreTerminal
+    local function top(terminal)
+        local seen = {}
+        while child(terminal) and not seen[terminal.address] do
+            seen[terminal.address] = true
+            terminal = by_address[terminal.parent]
+        end
+        return terminal
+    end
+    ---@param terminal HerdrCoreTerminal
+    ---@return boolean
+    local function waits(terminal)
+        return attention.display(terminal, child(terminal)).waiting
+    end
     ---@type table<string, HerdrCoreSidebarGroup>
     local groups = {}
     for _, terminal in ipairs(terminals) do
-        local root = terminal.labels["herdr.space"] or terminal.folder
-        local key = (terminal.machine or "") .. "\0" .. root
-        groups[key] = groups[key] or { root = root, machine = terminal.machine, terminals = {}, updated = 0 }
+        local head = top(terminal)
+        local root = head.labels["herdr.space"] or head.folder
+        local key = (head.machine or "") .. "\0" .. root
+        groups[key] = groups[key] or { root = root, machine = head.machine, terminals = {}, updated = 0 }
         groups[key].updated = math.max(groups[key].updated, terminal.status_ms or terminal.created_ms)
         table.insert(groups[key].terminals, terminal)
     end
@@ -96,7 +125,7 @@ function M.update(previous, terminals, options)
         end
         local waiting = 0
         for _, terminal in ipairs(group.terminals) do
-            if attention.display(terminal).waiting then waiting = waiting + 1 end
+            if waits(terminal) then waiting = waiting + 1 end
         end
         total_waiting = total_waiting + waiting
         local machine_folded = group.machine and options.folded and options.folded["machine:" .. group.machine]
@@ -109,26 +138,52 @@ function M.update(previous, terminals, options)
                 waiting = waiting
             })
         end
-        for _, terminal in ipairs(group.terminals) do
-            terminal_index = terminal_index + 1
-            state.terminals[terminal.address] = terminal_index
-            state.locations[terminal.address] = root
-            if not machine_folded then
-                local program = (terminal.program or ""):match([=[[^/\]+$]=]) or ""
-                program = program:gsub("%.[eE][xX][eE]$", "")
-                table.insert(rows, {
-                    kind = "terminal",
-                    address = terminal.address,
-                    status = attention
-                        .display(terminal)
-                        .status,
-                    lines = {
-                        terminal.labels["herdr-core-nvim.name"] or terminal.name or terminal.address,
-                        program
-                    }
-                })
+        ---@param parent? string
+        ---@return HerdrCoreTerminal[]
+        local function children(parent)
+            return vim.tbl_filter(
+                function (terminal) return (child(terminal) and terminal.parent or nil) == parent end, group.terminals
+            )
+        end
+        ---@param terminal HerdrCoreTerminal
+        ---@return integer
+        local function waiting_below(terminal)
+            local count = 0
+            for _, inner in ipairs(children(terminal.address)) do
+                count = count + (waits(inner) and 1 or 0) + waiting_below(inner)
+            end
+            return count
+        end
+        -- Each family in the space's order, children right under their parent, siblings in that order too.
+        ---@param parent? string
+        ---@param prefix  string
+        local function add(parent, prefix)
+            local family = children(parent)
+            for index, terminal in ipairs(family) do
+                local last = index == #family
+                terminal_index = terminal_index + 1
+                state.terminals[terminal.address] = terminal_index
+                state.locations[terminal.address] = root
+                if not machine_folded then
+                    local program = (terminal.program or ""):match([=[[^/\]+$]=]) or ""
+                    program = program:gsub("%.[eE][xX][eE]$", "")
+                    local below = waiting_below(terminal)
+                    table.insert(rows, {
+                        kind = "terminal",
+                        address = terminal.address,
+                        status = attention.display(terminal, child(terminal)).status,
+                        guide = parent and prefix .. (last and "└ " or "├ ") or nil,
+                        waiting = below > 0 and below or nil,
+                        lines = {
+                            terminal.labels["herdr-core-nvim.name"] or terminal.name or terminal.address,
+                            program
+                        }
+                    })
+                end
+                add(terminal.address, parent and prefix .. (last and "  " or "│ ") or "")
             end
         end
+        add(nil, "")
     end
     if options.collapsed then
         return state, { { kind = "summary", lines = {}, waiting = total_waiting } }

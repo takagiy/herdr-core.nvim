@@ -116,6 +116,25 @@ T["keeps the foreground arguments and the agent name for telling programs apart"
     MiniTest.expect.equality({ terminal.argv, terminal.app }, { { "node", "/opt/gemini/gemini.js" }, "gemini" })
 end
 
+T["keeps the parent of a terminal another one started"] = function ()
+    -- Given a local child, a remote child naming its parent on its own machine, one naming it in full, and a top terminal
+    fake_process(vim.json.encode({
+            terminals = {
+                { address = "t2", cwd = "/app", labels = {}, created_ms = 1, parent = "t1" },
+                { address = "vps/t5", cwd = "/app", labels = {}, created_ms = 1, parent = "t4" },
+                { address = "vps/t6", cwd = "/app", labels = {}, created_ms = 1, parent = "vps/t4" },
+                { address = "t3", cwd = "/app", labels = {}, created_ms = 1 }
+            }
+        }))
+    ---@type HerdrCoreTerminalsListed?
+    local event
+    -- When the list is converted
+    require("herdr-core.adapter.hc").list(function (value) event = value end)
+    -- Then each keeps its parent's address, with the machine for a remote one
+    local parents = vim.tbl_map(function (terminal) return terminal.parent or false end, assert(event).terminals)
+    MiniTest.expect.equality(parents, { "t1", "vps/t4", "vps/t4", false })
+end
+
 T["converts a terminal list to a core event"] = function ()
     -- Given hc JSON with a remote foreground process and status record
     local calls = fake_process(vim.json.encode({
