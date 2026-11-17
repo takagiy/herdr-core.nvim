@@ -45,6 +45,9 @@ Neovim, the plugin, hc, the Node.js dummy agent, the shell and the notification 
   - [x] space 見出しで Enter を押したりクリックしたりしても、所属するターミナルが表示されたまま操作できる。
   - [x] When the user clicks `«` and then `»`, the sidebar can collapse to a strip and expand again without changing the terminal windows.
 
+- Show workers under the agent that started them.
+  - [x] When an agent starts another with hc run, the sidebar can list the worker under it on one line and count it on the agent when it is blocked.
+
 ## Spaces
 
 - Group terminals by the folder they run in.
@@ -59,6 +62,12 @@ Neovim, the plugin, hc, the Node.js dummy agent, the shell and the notification 
   - [x] When Neovim restarts, the plugin can restore the tab order, the splits and the terminal in each window.
   - [x] When a window was closed before Neovim restarted, the plugin can leave it closed while its terminal keeps running in hc.
   - [x] When Neovim starts with a file, the plugin can restore the saved layout and keep the file's window.
+
+## Resuming conversations
+
+- Label a kept shell with the real hook, then start Neovim.
+  - [x] When hc restarts a kept terminal whose conversation was cut off, a new Neovim can type the resume command into it.
+  - [x] When the user quit the agent and its shell still runs, a new Neovim can leave the terminal alone.
 
 ## Several Neovims
 
