@@ -45,3 +45,4 @@ The sidebar window.
 - [x] When the user clicks New terminal, the sidebar can act after the mouse button is released, so the picker it opens keeps the focus.
 - [x] When the cursor is on a button's row, the sidebar can give only the button the accent and leave the rest of the row plain.
 - [x] When a row is a child, the sidebar can draw it on one line with its guide, status, name and dimmed program, and show a parent's waiting count after its name.
+- [x] When a trackpad scrolls the sidebar sideways, the sidebar can return to its left edge, wherever the cursor is.
