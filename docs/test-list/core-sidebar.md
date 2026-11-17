@@ -23,3 +23,4 @@ The rows the sidebar shows.
 - [x] When a remote machine heading is folded, the sidebar can hide its projects without losing the total waiting count.
 
 - [x] プログラムはパスを除いた実行ファイル名を表示し、大小文字を問わず .exe を省く。
+- [x] When a program was run through a link, such as claude pointing to a versioned file, the sidebar can show the name it was run by, from its argv.

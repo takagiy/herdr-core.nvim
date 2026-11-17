@@ -279,6 +279,23 @@ T["counts the children that need the user on their parent and space"] = function
     MiniTest.expect.equality({ by["/app"].waiting, by.t1.waiting, by.t3.status }, { 1, 1, "idle" })
 end
 
+T["shows the command the user ran rather than the file a link points to"] = function ()
+    -- Given claude run through a link to a versioned file, a login shell, and a full path on Windows
+    local sidebar = require("herdr-core.core.sidebar")
+    local cases = {
+        { program = "2.1.326", argv = { "claude", "--resume", "abc" } }, { program = "zsh", argv = { "-zsh" } },
+        { program = "claude.exe", argv = { "C:/Users/me/.local/bin/claude.exe" } }
+    }
+    local shown = {}
+    -- When each terminal is displayed
+    for _, fields in ipairs(cases) do
+        local _, rows = sidebar.update(nil, { terminal("t1", "/app", fields) })
+        shown[#shown + 1] = assert(rows[2]).lines[2]
+    end
+    -- Then the name the command was run by is shown, without a login shell's dash
+    MiniTest.expect.equality(shown, { "claude", "zsh", "claude" })
+end
+
 T["shows executable basenames without Windows exe suffixes"] = function ()
     -- Given executable paths from Windows and Unix foreground processes
     local sidebar = require("herdr-core.core.sidebar")
