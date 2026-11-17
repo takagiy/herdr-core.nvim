@@ -211,7 +211,7 @@ T["resumes a conversation left in a terminal whose agent is gone"] = function ()
     -- Then the labels are cleared first and the resume command is typed once
     MiniTest.expect.equality(child.lua_get("requests.cleared"), {
         "t1",
-        { ["herdr-core-nvim.agent"] = "", ["herdr-core-nvim.session"] = "" }
+        { ["herdr-core-nvim.agent"] = "", ["herdr-core-nvim.session"] = "", ["herdr-core-nvim.pid"] = "" }
     })
     MiniTest.expect.equality(child.lua_get("requests.typed"), { { "t1", "tool --resume abc" } })
 end

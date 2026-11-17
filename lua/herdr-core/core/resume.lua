@@ -29,8 +29,10 @@ function M.find(terminals, resuming, resumable)
         local agent = text(terminal.labels["herdr-core-nvim.agent"])
         local session = text(terminal.labels["herdr-core-nvim.session"])
         local program = { app = terminal.app, name = terminal.program, argv = terminal.argv }
-        if agent and session
-            and not terminal.machine and not next_resuming[terminal.address]
+        -- The same first process means the user quit the agent; hc restarting the terminal gives it a new one.
+        local recorded = text(terminal.labels["herdr-core-nvim.pid"])
+        local quit = recorded ~= nil and terminal.pid ~= nil and recorded == tostring(terminal.pid)
+        if agent and session and not quit and not terminal.machine and not next_resuming[terminal.address]
             and resumable(agent, program) then
             next_resuming[terminal.address] = true
             effects[#effects + 1] = {

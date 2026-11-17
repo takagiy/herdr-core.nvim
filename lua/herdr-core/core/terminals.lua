@@ -14,6 +14,7 @@ local M = {}
 ---@field created_ms integer
 ---@field status_ms  integer?
 ---@field parent?    string                The terminal that started this one.
+---@field pid?       integer               The terminal's first process; a restart by hc replaces it.
 
 ---@class HerdrCoreStatusChanged
 ---@field type      'status_changed'
@@ -114,21 +115,7 @@ function M.update(state, event)
         ---@type HerdrCoreTerminal?
         local current = state[event.terminal]
         if current then
-            local terminal = {
-                address = current.address,
-                machine = current.machine,
-                parent = current.parent,
-                name = current.name,
-                labels = current.labels,
-                status = current.status,
-                turn = current.turn,
-                program = current.program,
-                argv = current.argv,
-                app = current.app,
-                folder = current.folder,
-                created_ms = current.created_ms,
-                status_ms = current.status_ms
-            }
+            local terminal = vim.tbl_extend("force", {}, current) --[[@as HerdrCoreTerminal]]
             if event.type == "foreground_changed" then
                 terminal.program = event.program
                 terminal.argv = event.argv

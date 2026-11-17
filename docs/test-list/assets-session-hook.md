@@ -3,6 +3,7 @@
 The script agents' hooks run with `nvim -l`.
 
 - [x] When a conversation starts in an hc terminal, the hook can label the terminal with the integration and the conversation id.
+- [x] When a conversation starts, the hook can also label the terminal's first process id, so a resume can tell a restarted terminal from an agent the user quit.
 - [x] When a conversation ends, the hook can clear both labels.
 - [x] When the payload names the id with another field, the hook can find it among the known field names.
 - [x] When `--id` names fields, the hook can read only those, in order.

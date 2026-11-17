@@ -3,11 +3,13 @@ local T = MiniTest.new_set()
 
 local hook = dofile("assets/session-hook.lua")
 
+---@param pid? integer The process id `hc get` reports for the terminal.
 ---@return string[][], fun(argv: string[]): string?
-local function fake_hc()
+local function fake_hc(pid)
     local calls = {}
     return calls, function (argv)
             calls[#calls + 1] = argv
+            if argv[2] == "get" and pid then return vim.json.encode({ address = argv[3], pid = pid }) end
             return ""
         end
 end
@@ -21,13 +23,14 @@ local function labelled(calls)
 end
 
 T["labels the terminal when a conversation starts"] = function ()
-    -- Given a codex conversation starting in hc terminal t3
-    local calls, run = fake_hc()
+    -- Given a codex conversation starting in hc terminal t3, whose first process is 42
+    local calls, run = fake_hc(42)
     -- When the hook runs for the start
     hook.main({ "codex", "--event", "started" }, '{"session_id":"abc-1"}', { HC_TERMINAL_ID = "t3" }, run)
-    -- Then t3 carries the integration and the conversation in one label call
+    -- Then t3 carries the integration, the conversation and that process in one label call
     MiniTest.expect.equality(calls, {
-        { "hc", "label", "t3", "herdr-core-nvim.agent=codex", "herdr-core-nvim.session=abc-1" }
+        { "hc", "get", "t3", "--json" },
+        { "hc", "label", "t3", "herdr-core-nvim.agent=codex", "herdr-core-nvim.session=abc-1", "herdr-core-nvim.pid=42" }
     })
 end
 
@@ -36,8 +39,10 @@ T["clears the labels when a conversation ends"] = function ()
     local calls, run = fake_hc()
     -- When the hook runs for the end
     hook.main({ "claude", "--event", "ended" }, '{"session_id":"abc-1"}', { HC_TERMINAL_ID = "t3" }, run)
-    -- Then both labels are emptied together
-    MiniTest.expect.equality(calls, { { "hc", "label", "t3", "herdr-core-nvim.agent=", "herdr-core-nvim.session=" } })
+    -- Then the labels are emptied together
+    MiniTest.expect.equality(calls, {
+        { "hc", "label", "t3", "herdr-core-nvim.agent=", "herdr-core-nvim.session=", "herdr-core-nvim.pid=" }
+    })
 end
 
 T["finds the id among the known field names"] = function ()

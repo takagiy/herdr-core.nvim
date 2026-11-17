@@ -165,7 +165,11 @@ function M.setup(config)
             next_resume = math.max(now, next_resume) + 100
             vim.defer_fn(function ()
                 if not active then return end
-                local cleared = { ["herdr-core-nvim.agent"] = "", ["herdr-core-nvim.session"] = "" }
+                local cleared = {
+                    ["herdr-core-nvim.agent"] = "",
+                    ["herdr-core-nvim.session"] = "",
+                    ["herdr-core-nvim.pid"] = ""
+                }
                 hc.labels(effect.terminal, cleared, function (err)
                     if err then return report(err) end
                     hc.send(effect.terminal, definition.resume_command(effect.session), function (failure)

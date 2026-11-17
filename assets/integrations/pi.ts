@@ -1,6 +1,5 @@
 // Installed by herdr-core.nvim: labels the hc terminal with this pi session so it can be resumed.
 import { spawn } from "node:child_process";
-import path from "node:path";
 
 const started: string = {{start_command}};
 
@@ -15,12 +14,8 @@ function report(id: string | undefined): void {
   } catch {}
 }
 
-// The session file resumes from any folder; the id is the fallback.
+// The id, not the session file: a path is not typed into the shell when resuming.
 function session(ctx: any): string | undefined {
-  try {
-    const file = ctx?.sessionManager?.getSessionFile?.();
-    if (typeof file === "string" && (path.posix.isAbsolute(file) || path.win32.isAbsolute(file))) return file;
-  } catch {}
   try {
     const id = ctx?.sessionManager?.getSessionId?.();
     if (typeof id === "string" && id) return id;

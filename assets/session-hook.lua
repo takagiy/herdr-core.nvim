@@ -63,9 +63,17 @@ function M.main(argv, input, env, run)
     local parent = options.parent_id_env and text(env[options.parent_id_env])
     if parent and parent ~= id then return options.reply end
     if options.event == "ended" then
-        run({ "hc", "label", terminal, "herdr-core-nvim.agent=", "herdr-core-nvim.session=" })
+        run({ "hc", "label", terminal, "herdr-core-nvim.agent=", "herdr-core-nvim.session=", "herdr-core-nvim.pid=" })
     elseif id then
-        run({ "hc", "label", terminal, "herdr-core-nvim.agent=" .. options.name, "herdr-core-nvim.session=" .. id })
+        local labels = {
+            "hc", "label", terminal, "herdr-core-nvim.agent=" .. options.name, "herdr-core-nvim.session=" .. id
+        }
+        -- The terminal's first process changes only when hc restarts the terminal, not when the user quits the agent.
+        local found, record = pcall(vim.json.decode, run({ "hc", "get", terminal, "--json" }) or "")
+        if found and type(record) == "table" and type(record.pid) == "number" then
+            labels[#labels + 1] = "herdr-core-nvim.pid=" .. record.pid
+        end
+        run(labels)
     end
     return options.reply
 end
