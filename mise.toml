@@ -26,7 +26,8 @@ macos-x64 = { url = "https://github.com/EmmyLuaLs/emmylua-analyzer-rust/releases
 [tasks.check]
 description = "Type-check with emmylua_check"
 # emmylua_check reads Neovim's API types from $VIMRUNTIME; take it from this project's Neovim.
-env = { VIMRUNTIME = "{{ exec(command='nvim --clean --headless --cmd \"lua io.write(vim.env.VIMRUNTIME)\" +q') }}" }
+# The path comes from the binary, not $VIMRUNTIME: a Neovim terminal passes on its own, and exec does not see unset variables.
+env = { VIMRUNTIME = "{{ exec(command='nvim -u NONE -i NONE --headless --cmd \"lua io.write(vim.fn.fnamemodify(vim.v.progpath, [[:h:h]]) .. [[/share/nvim/runtime]])\" +q') }}" }
 run = "emmylua_check --warnings-as-errors ."
 
 [tasks.fmt]
@@ -39,11 +40,13 @@ run = "luafmt . --check"
 
 [tasks.test]
 description = "Run the tests with mini.test"
+# A Neovim terminal passes on its own VIM and VIMRUNTIME, which would make this project's Neovim load another runtime.
+env = { VIM = false, VIMRUNTIME = false }
 run = "nvim --headless --noplugin -u NONE -c \"lua dofile('scripts/test.lua')\""
 
 [tasks.test-e2e]
 description = "Run E2E with real hc and terminal processes"
-env = { HERDR_TEST_GROUP = "e2e" }
+env = { HERDR_TEST_GROUP = "e2e", VIM = false, VIMRUNTIME = false }
 run = "nvim --headless --noplugin -u NONE -c \"lua dofile('scripts/test.lua')\""
 
 [tasks.test-e2e-linux]
