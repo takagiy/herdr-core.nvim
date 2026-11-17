@@ -51,7 +51,7 @@ The plugin maps no global keys.
             -- Enter terminal mode when the cursor moves into a terminal window.
             auto_insert = true,
             -- Width of the sidebar.
-            sidebar_width = 32,
+            sidebar_width = 24,
             -- Keys inside the sidebar.
             sidebar_keys = {
                 activate = "<CR>",

@@ -59,7 +59,18 @@ T["draws headings counts and two-line terminals with highlights"] = function ()
     end
     -- The space heading carries the count, so the header shows no total.
     MiniTest.expect.equality(badge, nil)
-    MiniTest.expect.equality(lines[#lines], string.rep(" ", 29) .. " « ")
+    MiniTest.expect.equality(lines[#lines], string.rep(" ", 21) .. " « ")
+end
+
+T["opens 24 columns wide when shown without a width"] = function ()
+    -- Given a sidebar
+    local sidebar = require("herdr-core.ui.sidebar").create()
+    -- When it is shown without a width
+    local window = sidebar.show()
+    local width = vim.api.nvim_win_get_width(window)
+    sidebar.close()
+    -- Then its window is 24 columns wide
+    MiniTest.expect.equality(width, 24)
 end
 
 -- When the user switches tabpages, the sidebar can stay on the same side and width.
