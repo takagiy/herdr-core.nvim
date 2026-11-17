@@ -225,7 +225,10 @@ end
 ---@param address string
 ---@return string[]
 function M.attach(address)
-    return { "hc", "attach", address }
+    if vim.fn.has("win32") == 1 then return { "hc", "attach", address } end
+    -- hc attach starts with ESC[?1049l, which restores a saved cursor. With nothing saved, Neovim's terminal restores
+    -- black colors and the following clear paints the screen black, so sh saves the defaults with ESC 7 first.
+    return { "sh", "-c", [[printf '\0337'; exec "$0" attach "$@"]], "hc", address }
 end
 
 ---@param address  string

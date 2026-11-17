@@ -31,22 +31,39 @@ local function fake_process(output, code)
     return calls, options
 end
 
-T["provides an attach argv without shell interpolation"] = function ()
-    -- Given a terminal address
-    local hc = require("herdr-core.adapter.hc")
-    -- When the UI asks how to attach
-    local argv = hc.attach("t1")
-    -- Then it receives a direct process argv
-    MiniTest.expect.equality(argv, { "hc", "attach", "t1" })
+---@param windows boolean
+---@param address string
+---@return string[]
+local function attach_on(windows, address)
+    local has = vim.fn.has
+    ---@param feature string
+    ---@return integer
+    vim.fn.has = function (feature) return feature == "win32" and (windows and 1 or 0) or has(feature) end
+    local ok, argv = pcall(require("herdr-core.adapter.hc").attach, address)
+    vim.fn.has = has
+    assert(ok, argv)
+    return argv
 end
 
-T["keeps a remote terminal address qualified when attaching"] = function ()
-    -- Given a terminal on a named remote machine
-    local hc = require("herdr-core.adapter.hc")
-    -- When the UI requests its attach command
-    local argv = hc.attach("server/t1")
-    -- Then the machine and address remain one argument
+T["attaches with hc directly on Windows"] = function ()
+    -- Given Windows, where no sh runs the attach
+    -- When the UI asks how to attach to a remote terminal
+    local argv = attach_on(true, "server/t1")
+    -- Then it gets hc's own argv, the address one argument
     MiniTest.expect.equality(argv, { "hc", "attach", "server/t1" })
+end
+
+T["saves the cursor and colors before attaching elsewhere"] = function ()
+    -- Given a system with sh
+    -- When the UI asks how to attach to a remote terminal
+    local argv = attach_on(false, "server/t1")
+    -- Then sh saves the cursor and colors with ESC 7 and becomes hc attach, so hc's ESC[?1049l restores the defaults
+    MiniTest.expect.equality(argv, { "sh", "-c", [[printf '\0337'; exec "$0" attach "$@"]], "hc", "server/t1" })
+    if vim.fn.executable("sh") == 0 then return end
+    local echoed = vim.deepcopy(argv)
+    echoed[4] = "echo"
+    local result = vim.system(echoed, { text = true }):wait()
+    MiniTest.expect.equality(result.stdout, "\0277attach server/t1\n")
 end
 
 T["starts a kept terminal without agent identity variables"] = function ()
