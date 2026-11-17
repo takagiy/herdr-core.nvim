@@ -251,6 +251,29 @@ T["folds a machine and unfolds it again"] = function ()
 end
 
 -- When a machine heading is folded, `view` can still count that machine's terminals waiting for the user.
+T["notifies and counts a child only when it needs the user"] = function ()
+    -- Given a working lead, a working child, and a child whose turn is unseen, in a Neovim that is not focused
+    local core = require("herdr-core.core.state")
+    local state = core.new()
+    state.terminals.t1 = terminal("t1", { status = "working" })
+    state.terminals.t2 = terminal("t2", { status = "working", parent = "t1" })
+    state.terminals.t3 = terminal("t3", { status = "idle", turn = 2, parent = "t1", labels = { ["herdr.seen"] = "1" } })
+    state = core.update(state, { type = "focus_changed", focused = false, terminals = {} })
+    -- When the child finishes, or is blocked instead
+    local _, finished = core.update(state, { type = "status_changed", terminal = "t2", status = "done", status_ms = 2 })
+    local _, blocked = core.update(state, {
+        type = "status_changed",
+        terminal = "t2",
+        status = "blocked",
+        status_ms = 2
+    })
+    local _, _, waiting = core.view(state)
+    -- Then only the block is notified, and the unseen turn of a child does not wait for the user
+    MiniTest.expect.equality(finished, {})
+    MiniTest.expect.equality(blocked, { { type = "notify", terminal = "t2", name = "t2", status = "blocked" } })
+    MiniTest.expect.equality(waiting, 0)
+end
+
 T["counts waiting terminals on a folded machine"] = function ()
     -- Given a blocked terminal on a remote machine whose heading is folded
     local core = require("herdr-core.core.state")

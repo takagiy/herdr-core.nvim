@@ -114,13 +114,19 @@ local function terminal(record)
         assert(type(record.status) == "table" and type(record.status.state) == "string", "Invalid hc status")
     end
     assert(record.name == nil or type(record.name) == "string", "Invalid hc terminal name")
+    assert(record.parent == nil or type(record.parent) == "string", "Invalid hc parent")
     assert(argv == nil or (type(argv) == "table" and vim.islist(argv)), "Invalid hc argv")
     for _, argument in ipairs(argv or {}) do
         assert(type(argument) == "string", "Invalid hc argv item")
     end
+    local machine = record.address:match("^([^/]+)/")
+    local parent = record.parent
+    -- A remote core names the parent on its own machine.
+    if parent and machine and not parent:find("/", 1, true) then parent = machine .. "/" .. parent end
     return {
         address = record.address,
-        machine = record.address:match("^([^/]+)/"),
+        machine = machine,
+        parent = parent,
         name = record.name,
         folder = folder(foreground and foreground.cwd or record.cwd),
         program = foreground and foreground.name or (record.argv and record.argv[1]),

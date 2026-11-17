@@ -155,7 +155,8 @@ function M.update(state, event)
         if before and after then
             local visible = vim.tbl_contains(state.shown, event.terminal)
             -- shortcut: each Neovim notifies on its own, so two open Neovims notify twice; coordinate through the core if that bothers.
-            local notify = attention.notification(before, after, state.focused, visible)
+            local child = terminals.is_child(next_terminals, after)
+            local notify = attention.notification(before, after, state.focused, visible, child)
             if notify then table.insert(effects, notify) end
             -- A terminal in front of the user is seen again each time its turn ends.
             local marks
@@ -249,7 +250,9 @@ function M.view(state)
     -- Count from the terminals, not the rows: a folded machine hides its rows.
     local waiting = 0
     for _, terminal in ipairs(list) do
-        if attention.display(terminal).waiting then waiting = waiting + 1 end
+        if attention.display(terminal, terminals.is_child(state.terminals, terminal)).waiting then
+            waiting = waiting + 1
+        end
     end
     vim.list_extend(rows, setup.view(state.setup))
     return with(state, { sidebar = order }), rows, waiting

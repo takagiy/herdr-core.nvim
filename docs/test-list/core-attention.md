@@ -3,6 +3,8 @@
 Which terminals wait for the user, and when to tell the user.
 
 - [x] When a terminal is blocked or in error, attention can count it as waiting for the user.
+- [x] When a terminal has a live parent, attention can show its finished turn as idle and its error as blocked, so only a blocked child waits for the user.
+- [x] When a child finishes a turn, attention can skip the notification, and still notify when it is blocked.
 - [x] When a terminal's turn is newer than its `herdr.seen` label, attention can mark it done.
 - [x] When a terminal's `herdr.seen` label is at its turn, attention can mark it idle.
 - [x] When Neovim is focused and shows a terminal, attention can ask to raise its `herdr.seen` label to its turn, once per turn.

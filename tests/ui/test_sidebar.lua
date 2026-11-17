@@ -433,6 +433,27 @@ T["moves between sidebar items instead of display lines"] = function ()
     MiniTest.expect.equality({ counted, from_program, bottom, top }, { footer, 2, footer, 2 })
 end
 
+T["draws a child on one line under its parent's waiting count"] = function ()
+    -- Given a lead with one waiting child, and that child
+    require("herdr-core.ui.highlights").setup()
+    local sidebar = require("herdr-core.ui.sidebar").create()
+    -- When they are rendered
+    sidebar.render({
+        { kind = "terminal", address = "t1", status = "working", waiting = 1, lines = { "lead", "claude" } },
+        { kind = "terminal", address = "t2", status = "blocked", guide = "└ ", lines = { "review", "claude" } }
+    }, 0)
+    local lines = vim.api.nvim_buf_get_lines(sidebar.buffer, 2, 5, false)
+    local dimmed = {}
+    for _, mark in ipairs(vim.api.nvim_buf_get_extmarks(sidebar.buffer, -1, { 4, 0 }, { 4, -1 }, { details = true })) do
+        if assert(mark[4]).hl_group == "HerdrCoreProgram" then dimmed[#dimmed + 1] = mark[3] end
+    end
+    sidebar.close()
+    -- Then the lead shows the count, and the child takes one line with its guide and program dimmed
+    MiniTest.expect.equality(lines, { "  ◐ lead  · 1", "    claude", "    └ ● review  claude" })
+    table.sort(dimmed)
+    MiniTest.expect.equality(dimmed, { #"    ", #"    └ ● review  " })
+end
+
 T["dims the program but keeps the terminal name in normal text"] = function ()
     -- Given an idle terminal with a name and program
     require("herdr-core.ui.highlights").setup()

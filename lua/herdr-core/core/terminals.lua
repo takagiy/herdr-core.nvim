@@ -13,6 +13,7 @@ local M = {}
 ---@field folder     string
 ---@field created_ms integer
 ---@field status_ms  integer?
+---@field parent?    string                The terminal that started this one.
 
 ---@class HerdrCoreStatusChanged
 ---@field type      'status_changed'
@@ -22,6 +23,14 @@ local M = {}
 ---@field status_ms integer
 
 ---@alias HerdrCoreTerminals table<string, HerdrCoreTerminal>
+
+-- A terminal is a child only while the terminal that started it is still there.
+---@param terminals table<string, HerdrCoreTerminal>
+---@param terminal  HerdrCoreTerminal
+---@return boolean
+function M.is_child(terminals, terminal)
+    return terminal.parent ~= nil and terminals[terminal.parent] ~= nil
+end
 
 ---@class HerdrCoreTerminalsListed
 ---@field type      'terminals_listed'
@@ -108,6 +117,7 @@ function M.update(state, event)
             local terminal = {
                 address = current.address,
                 machine = current.machine,
+                parent = current.parent,
                 name = current.name,
                 labels = current.labels,
                 status = current.status,

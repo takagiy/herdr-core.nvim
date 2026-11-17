@@ -16,6 +16,9 @@ The rows the sidebar shows.
 - [x] When a terminal moves to another space, the sidebar can put it at the top of that space.
 - [x] When a space has blocked or done terminals, the sidebar can show their count on its heading.
 - [x] When the sidebar is collapsed, it can show only the number of terminals waiting for the user.
+- [x] When a terminal has a live parent, the sidebar can list it under its parent in the parent's space, one level deeper, with tree guides.
+- [x] When a terminal's parent is gone, the sidebar can list it as a usual terminal in its own space.
+- [x] When children wait for the user, the sidebar can count them on their parent and on the space heading.
 
 - [x] When a remote machine heading is folded, the sidebar can hide its projects without losing the total waiting count.
 

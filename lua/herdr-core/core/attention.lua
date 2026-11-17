@@ -6,7 +6,7 @@ local M = {}
 
 ---@param terminal HerdrCoreTerminal
 ---@return HerdrCoreAttention
-function M.display(terminal)
+local function plain(terminal)
     if terminal.status == "working" then
         return { status = "working", waiting = false }
     end
@@ -18,6 +18,19 @@ function M.display(terminal)
         return { status = "idle", waiting = false }
     end
     return { status = terminal.status, waiting = terminal.status == "blocked" or terminal.status == "error" }
+end
+
+---@param terminal HerdrCoreTerminal
+---@param child?   boolean           Whether the terminal that started it is still there.
+---@return HerdrCoreAttention
+function M.display(terminal, child)
+    local display = plain(terminal)
+    if child then
+        -- A child reports to its parent, so its finished turn is the parent's news; an error stops it like a block.
+        if display.status == "done" then return { status = "idle", waiting = false } end
+        if display.status == "error" then return { status = "blocked", waiting = true } end
+    end
+    return display
 end
 
 ---@param read     table<string, integer>
@@ -69,16 +82,17 @@ end
 ---@param after   HerdrCoreTerminal
 ---@param focused boolean
 ---@param visible boolean
+---@param child?  boolean
 ---@return HerdrCoreNotify?
-function M.notification(before, after, focused, visible)
+function M.notification(before, after, focused, visible, child)
     if focused and visible then
         return nil
     end
-    local display = M.display(after)
+    local display = M.display(after, child)
     if display.status ~= "blocked" and display.status ~= "done" then
         return nil
     end
-    if M.display(before).status == display.status and (display.status == "blocked" or before.turn == after.turn) then
+    if M.display(before, child).status == display.status and (display.status == "blocked" or before.turn == after.turn) then
         return nil
     end
     return {

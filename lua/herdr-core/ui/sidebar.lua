@@ -264,8 +264,28 @@ function M.create(on_action, keys)
                 space_mark = 0
                 lines[#lines + 1] = (row.machine or "") .. (row.connected == false and " (disconnected)" or "")
                 marks[#marks + 1] = { row = #lines - 1, group = "HerdrCoreMachine" }
+            elseif row.kind == "terminal" and row.guide then
+                -- A child takes one line under its parent's name: guide, status, name, then the program dimmed.
+                local guide = "    " .. row.guide
+                local head = guide .. (symbols[row.status] or " ") .. " "
+                local name = row.lines[1] or ""
+                local status = row.status or "idle"
+                lines[#lines + 1] = head .. name .. "  " .. (row.lines[2] or "")
+                vim.list_extend(marks, {
+                    { row = #lines - 1, group = "HerdrCoreProgram", start_col = 4, end_col = #guide },
+                    {
+                        row = #lines - 1,
+                        group = "HerdrCore" .. status:sub(1, 1):upper() .. status:sub(2),
+                        start_col = #guide,
+                        end_col = #head
+                    },
+                    { row = #lines - 1, group = "HerdrCoreLabel", start_col = #head, end_col = #head + #name },
+                    { row = #lines - 1, group = "HerdrCoreProgram", start_col = #head + #name + 2 }
+                })
+                space_of[start] = space_mark
             elseif row.kind == "terminal" then
-                lines[#lines + 1] = "  " .. (symbols[row.status] or " ") .. " " .. (row.lines[1] or "")
+                local count = (row.waiting or 0) > 0 and "  · " .. row.waiting or ""
+                lines[#lines + 1] = "  " .. (symbols[row.status] or " ") .. " " .. (row.lines[1] or "") .. count
                 marks[#marks + 1] = {
                     row = #lines - 1,
                     group = "HerdrCoreLabel",
