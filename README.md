@@ -77,6 +77,18 @@ The plugin maps no global keys.
 }
 ```
 
+### Statusline
+
+If you use a statusline plugin, e.g. lualine, turn it off for the sidebar:
+
+```lua
+require("lualine").setup({
+    options = {
+        disabled_filetypes = { statusline = { "herdr-core" } },
+    },
+})
+```
+
 ### Custom integrations
 
 ```lua
