@@ -32,6 +32,10 @@ A TUI client for [herdr-core](https://github.com/herdrdev/herdr-core), built on 
 - `hc` on your PATH
 - Git
 
+## Limitations
+
+- Session restoring plugins (e.g. persisted.nvim, auto-session) may conflict with this plugin. Terminal sessions can be restored with this plugin.
+
 ## Installation and configuration
 
 With lazy.nvim:
