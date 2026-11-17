@@ -36,7 +36,7 @@ local function lines_with(buffer, group)
     return found
 end
 
-T["draws the Setup panel above the toggle with aligned buttons"] = function ()
+T["draws the Setup panel above the toggle with buttons ending one column inside the border"] = function ()
     -- Given a sidebar 32 columns wide
     require("herdr-core.ui.highlights").setup()
     local sidebar = require("herdr-core.ui.sidebar").create()
@@ -46,20 +46,55 @@ T["draws the Setup panel above the toggle with aligned buttons"] = function ()
     local lines = vim.api.nvim_buf_get_lines(sidebar.buffer, 0, -1, false)
     local buttons = lines_with(sidebar.buffer, "HerdrCoreButton")
     sidebar.close()
-    -- Then the box ends just above the toggle and its buttons start in one column
+    -- Then the box ends just above the toggle, its buttons end in one column and the long error wraps
     local count = #lines
-    MiniTest.expect.equality(lines[count - 7], " ╭ Setup " .. string.rep("─", 21) .. "╮")
-    local panel = { lines[count - 6], lines[count - 5], lines[count - 4], lines[count - 3], lines[count - 2] }
+    MiniTest.expect.equality(lines[count - 8], " ╭ Setup " .. string.rep("─", 21) .. "╮")
+    local panel = {}
+    for line = count - 7, count - 2 do
+        panel[#panel + 1] = lines[line]
+    end
     MiniTest.expect.equality(panel, {
-        " │ Integration  Install all   │",
+        " │ Integration   Install all  │",
         " │ Supported agents detected. │",
-        " │  claude      Install       │",
-        " │  ! settings.json is not JSO│",
-        " │              Dismiss       │"
+        " │  claude           Install  │",
+        " │  ! settings.json is not    │",
+        " │  JSON                      │",
+        " │                   Dismiss  │"
     })
     MiniTest.expect.equality(lines[count - 1], " ╰" .. string.rep("─", 28) .. "╯")
     MiniTest.expect.equality(#buttons, 5)
-    MiniTest.expect.equality(vim.fn.strdisplaywidth(assert(lines[count - 7])), 31)
+    MiniTest.expect.equality(vim.fn.strdisplaywidth(assert(lines[count - 8])), 31)
+end
+
+T["puts a Setup button that does not fit beside its name on the next line and wraps text"] = function ()
+    -- Given a sidebar 24 columns wide
+    require("herdr-core.ui.highlights").setup()
+    local sidebar = require("herdr-core.ui.sidebar").create()
+    sidebar.show(24)
+    -- When rows with a Setup panel are rendered
+    sidebar.render(rows, 0)
+    local lines = vim.api.nvim_buf_get_lines(sidebar.buffer, 0, -1, false)
+    local buttons = lines_with(sidebar.buffer, "HerdrCoreButton")
+    sidebar.close()
+    -- Then Install all sits under its heading, the buttons end in one column and long text wraps
+    local count = #lines
+    local panel = {}
+    for line = count - 10, count - 1 do
+        panel[#panel + 1] = lines[line]
+    end
+    MiniTest.expect.equality(panel, {
+        " ╭ Setup " .. string.rep("─", 13) .. "╮",
+        " │ Integration        │",
+        " │       Install all  │",
+        " │ Supported agents   │",
+        " │ detected.          │",
+        " │  claude   Install  │",
+        " │  ! settings.json is│",
+        " │  not JSON          │",
+        " │           Dismiss  │",
+        " ╰" .. string.rep("─", 20) .. "╯"
+    })
+    MiniTest.expect.equality(vim.tbl_contains(buttons, count - 8), true)
 end
 
 T["moves onto Setup buttons and presses the one under the cursor"] = function ()

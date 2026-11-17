@@ -2,9 +2,6 @@ local M = {}
 
 local symbols = { working = "◐", blocked = "●", error = "✗", done = "✓", idle = "○" }
 
--- Labels on the left of the Setup panel take this many columns, the last one a gap; buttons start after them.
-local label_width = 13
-
 ---@param text  string
 ---@param width integer
 ---@return string
@@ -14,6 +11,25 @@ local function fit(text, width)
         shown = vim.fn.strcharpart(shown, 0, vim.fn.strchars(shown) - 1)
     end
     return shown .. string.rep(" ", width - vim.fn.strdisplaywidth(shown))
+end
+
+-- Breaks text at spaces into lines no wider than width, each starting with indent; fit cuts a word that is wider.
+---@param indent string
+---@param text   string
+---@param width  integer
+---@return string[]
+local function wrap(indent, text, width)
+    local lines, line = {}, indent
+    for word in text:gmatch("%S+") do
+        local longer = line == indent and indent .. word or line .. " " .. word
+        if line ~= indent and vim.fn.strdisplaywidth(longer) > width then
+            lines[#lines + 1] = line
+            longer = indent .. word
+        end
+        line = longer
+    end
+    lines[#lines + 1] = line
+    return lines
 end
 
 ---@class HerdrCoreSetupLine
@@ -29,24 +45,41 @@ end
 ---@return HerdrCoreSetupLine[]
 local function setup_box(rows, width)
     if #rows == 0 then return {} end
-    local inner = math.max(label_width + 2, width - 4)
+    -- Wide enough for the longest button, Install all, with a column on each side.
+    local inner = math.max(15, width - 4)
     local lines = { { text = " ╭ Setup " .. string.rep("─", inner - 7) .. "╮", group = "HerdrCoreMuted" } }
     for _, row in ipairs(rows) do
         local indent = (row.kind == "setup_item" or row.kind == "setup_error") and "  " or " "
-        local left = indent .. (row.lines[1] or "")
-        local line = { row = row }
+        local label = indent .. (row.lines[1] or "")
         if row.button then
-            left = fit(left, label_width - 1) .. " "
+            -- Buttons end one column inside the border; one that does not fit beside its name goes on the next line.
             local button = " " .. row.button .. " "
-            line.text = " │" .. left .. fit(button, inner - label_width) .. "│"
-            line.button_start = #(" │" .. left)
-            line.button_end = line.button_start + #button
-            line.group = row.kind == "setup_heading" and "HerdrCoreHeader" or nil
+            local start = inner - 1 - vim.fn.strdisplaywidth(button)
+            local beside = vim.fn.strdisplaywidth(label) + 1 <= start
+            if not beside then
+                lines[#lines + 1] = {
+                    text = " │" .. fit(label, inner) .. "│",
+                    row = row,
+                    group = row.kind == "setup_heading" and "HerdrCoreHeader" or nil
+                }
+            end
+            local before = " │" .. fit(beside and label or "", start)
+            lines[#lines + 1] = {
+                text = before .. button .. " │",
+                row = row,
+                group = beside and row.kind == "setup_heading" and "HerdrCoreHeader" or nil,
+                button_start = #before,
+                button_end = #before + #button
+            }
         else
-            line.text = " │" .. fit(left, inner) .. "│"
-            line.group = row.kind == "setup_heading" and "HerdrCoreHeader" or "HerdrCoreMuted"
+            for _, text in ipairs(wrap(indent, row.lines[1] or "", inner)) do
+                lines[#lines + 1] = {
+                    text = " │" .. fit(text, inner) .. "│",
+                    row = row,
+                    group = row.kind == "setup_heading" and "HerdrCoreHeader" or "HerdrCoreMuted"
+                }
+            end
         end
-        lines[#lines + 1] = line
     end
     lines[#lines + 1] = { text = " ╰" .. string.rep("─", inner) .. "╯", group = "HerdrCoreMuted" }
     return lines
@@ -83,7 +116,7 @@ function M.create(on_action, keys)
     local by_line = {}
     ---@type integer[]
     local positions = {}
-    local width, shown, collapsed, footer = 32, false, false, 0
+    local width, shown, collapsed, footer = 24, false, false, 0
     ---@type HerdrCoreSidebarRow[], integer
     local last_rows, last_waiting = {}, 0
     ---@type fun(rows: HerdrCoreSidebarRow[], waiting: integer?)
