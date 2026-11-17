@@ -15,6 +15,7 @@ Calls to the `hc` CLI, turned into core events.
 - [x] When some tabs of the saved layout are broken, the hc adapter can drop only those tabs and return the rest.
 - [x] When writing the layout and another client wrote first, the hc adapter can report a conflict.
 - [x] When attaching to a terminal, the hc adapter can give the command line for `hc attach`.
+- [x] Outside Windows, the attach command can save the cursor and colors with ESC 7 first, so hc's `ESC[?1049l` restores the default colors instead of black.
 - [x] When a terminal runs on another machine, the hc adapter can address it as `<machine>/<address>`.
 - [x] When `hc` is missing or the core cannot start, the hc adapter can report why.
 - [x] When hc reports the same folder with backslashes in one place and slashes in another, the hc adapter can report both as the same folder.
