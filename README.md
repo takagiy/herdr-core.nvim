@@ -13,6 +13,10 @@ A TUI client for [herdr-core](https://github.com/herdrdev/herdr-core), built on 
 - Automatically resumes agent conversations after a reboot.
 - Built-in integrations for Claude Code, Codex, Antigravity CLI, Copilot CLI, Cursor CLI, Droid, Grok, Kilo Code, Mastra Code, omp, opencode, pi, Qoder CLI and Qwen Code. You can [write your own](#custom-integrations).
 
+## Limitations
+
+- Session restoring plugins (e.g. persisted.nvim, auto-session) may conflict with this plugin. Terminal sessions can be restored with this plugin.
+
 ## Usage
 
 | Input | Action |
@@ -31,10 +35,6 @@ A TUI client for [herdr-core](https://github.com/herdrdev/herdr-core), built on 
 - Neovim 0.11 or later
 - `hc` on your PATH
 - Git
-
-## Limitations
-
-- Session restoring plugins (e.g. persisted.nvim, auto-session) may conflict with this plugin. Terminal sessions can be restored with this plugin.
 
 ## Installation and configuration
 
