@@ -147,6 +147,34 @@ T["toggles the pin label and sidebar order"] = function ()
 end
 
 -- When Neovim restarts, the sidebar can show the names and pins stored in hc.
+-- When an agent starts another with hc run, the sidebar can list the worker under it on one line and count it on the agent when it is blocked.
+T["lists a worker under the agent that started it"] = function ()
+    -- Given: an agent and a worker started for it
+    local lead = session.spawn(nil, "lead")
+    local worker = assert(session.hc({
+            "run",
+            "--bg",
+            "--json",
+            "--parent",
+            lead,
+            "--cwd",
+            session.root,
+            "--name",
+            "worker",
+            "--",
+            vim.fn.exepath("node"),
+            session.env.HERDR_E2E_PROJECT .. "/tests/e2e/dummy-agent.mjs"
+        }).address)
+    local child = session.editor()
+    -- When: the worker reports that it is blocked
+    session.hc({ "send", "--json", "--force", worker, "status blocked" })
+    -- Then: the worker sits under the agent with a tree guide, and the agent counts it
+    session.wait(function ()
+        local text = session.sidebar(child)
+        return text:find("lead  · 1", 1, true) ~= nil and text:find("    └ ● worker", 1, true) ~= nil
+    end, "worker under lead")
+end
+
 T["preserves the name and pin after restarting Neovim"] = function ()
     -- Given: a terminal renamed and pinned through the sidebar, alongside another terminal
     local address = session.spawn(nil, "agent")
