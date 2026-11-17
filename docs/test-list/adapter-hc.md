@@ -11,6 +11,7 @@ Calls to the `hc` CLI, turned into core events.
 - [x] When `hc events` reports that events were missed, the hc adapter can apply the fresh snapshot in that notification and refetch the layout without racing another terminal-list request.
 - [x] When writing a label, the hc adapter can run `hc label` and report a failure as an event.
 - [x] When reading the layout, the hc adapter can return the doc's value and version.
+- [x] When some tabs of the saved layout are broken, the hc adapter can drop only those tabs and return the rest.
 - [x] When writing the layout and another client wrote first, the hc adapter can report a conflict.
 - [x] When attaching to a terminal, the hc adapter can give the command line for `hc attach`.
 - [x] When a terminal runs on another machine, the hc adapter can address it as `<machine>/<address>`.
