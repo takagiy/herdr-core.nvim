@@ -19,7 +19,18 @@ herdr のターミナルでは、この `$NVIM` が正しくない。シェル�
 - アドレスに届いた要求は、すべて宛先の Neovim に渡す。`nvim --server "$NVIM" --remote` など、flatten.nvim 以外のツールも、Neovim に直接つないだときと同じに動く。
 - 効くのは、この機能を入れたあとに herdr-core.nvim が開いたターミナルと、その中でエージェントが `hc run` で起動した子ターミナル。PC の再起動後に hc が起動し直したターミナルでも効く。
 - すでに動いているターミナル、Herdr アプリや `hc run` で直接起動したターミナル、Neovim の `:terminal` は対象外。環境変数はプロセスの起動時に決まり、あとから変えられない。
+- ターミナルが別のマシンにあれば、`$NVIM` を空にする。そのマシンからローカルのアドレスには届かない。
 - 既定で有効にし、`setup()` の設定で無効にできる。無効のときは、新しいターミナルの `$NVIM` を空にする。エージェントから受け継いだ `CLAUDECODE` などを空にしているのと同じ扱い（[`inherited`](https://github.com/takagiy/herdr-core.nvim/blob/8ce0a61e7e16509a53f051856c43747bdce623fd/lua/herdr-core/adapter/hc.lua#L171-L176)）。設定の名前は未定。
+
+## ターミナルと Neovim のライフサイクル
+
+`$NVIM` を決められるのは、ターミナルを作る `terminal.run` の 1 回だけ。シェルは Neovim の子プロセスではないので、Neovim の環境は届かず、起動後は変えられない。
+
+1. Neovim A が `terminal.run` でターミナル t1 を作る。A はランダムな名前のアドレス（例: `\\.\pipe\herdr-core-nvim.<名前>`）を作り、`env.NVIM` とラベルの両方に入れる。t1 のアドレスは `terminal.run` の結果で初めて分かるので、名前は A が先に作る。ほかの Neovim はラベルからこのアドレスを知る。
+2. t1 のウィンドウにカーソルが入ると、A は `serverstart` でそのアドレスをリッスンする。
+3. t1 で `nvim foo` を起動すると、flatten.nvim が `$NVIM` に接続し、foo は A で開く。
+4. A が t1 を閉じるか終了すると、アドレスをリッスンする Neovim がなくなる。t1 のシェルは動き続け、`nvim` は接続に失敗して普通に起動する。
+5. Neovim B で t1 のウィンドウにカーソルが入ると、B がアドレスを引き継ぐ。1 つのアドレスをリッスンできるのは 1 プロセスだけなので、A がまだリッスンしていれば、B は RPC で A に `serverstop` させてから `serverstart` する。
 
 ## この案で諦めること
 
@@ -33,3 +44,4 @@ flatten.nvim に任せると、次の点は flatten.nvim の動作に従う。he
 
 - 本当にネストして起動したいときの指定方法（例: 環境変数 `HERDR_CORE_NVIM_NEST=1`）
 - README で flatten.nvim をどう案内するか
+- flatten.nvim が `$NVIM` への接続に失敗したとき、普通に起動するか（未確認）
