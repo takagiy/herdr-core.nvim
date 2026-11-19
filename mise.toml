@@ -3,7 +3,7 @@
 HC_VERSION = "0.1.21"
 
 [tools]
-neovim = "0.11.7"
+neovim = "0.12.6"
 node = "24.14.0"
 
 # EmmyLua's tools are not in mise's registry; one release holds both.
