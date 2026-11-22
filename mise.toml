@@ -1,6 +1,6 @@
 [env]
 # The hc that the E2E runs against. Renovate proposes newer versions.
-HC_VERSION = "0.1.21"
+HC_VERSION = "0.1.22"
 
 [tools]
 neovim = "0.12.6"
