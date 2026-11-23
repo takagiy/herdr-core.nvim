@@ -23,7 +23,7 @@ jobs:
       || startsWith(github.head_ref, 'renovate/neovim')
       || startsWith(github.head_ref, 'renovate/node')
       || startsWith(github.head_ref, 'renovate/hc')
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 35
     defaults:
       run:
