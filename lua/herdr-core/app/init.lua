@@ -5,7 +5,7 @@ local stop_previous
 ---@class HerdrCoreConfig
 ---@field auto_insert?   boolean
 ---@field sidebar_width? integer
----@field sidebar_keys?  HerdrCoreSidebarKeys
+---@field resources?     HerdrCoreResource[]                                                                                What the sidebar lists, in order; `{ resources.terminals() }` when left out.
 ---@field open?          fun(terminal: string): HerdrCoreOpenEffect
 ---@field notify?        fun(name: string, status: string)
 ---@field picker?        fun(items: HerdrCoreChoice[], options: { prompt: string }, on_choice: fun(item: HerdrCoreChoice?)) Lists the places for a new terminal; vim.ui.select fits.
@@ -18,6 +18,19 @@ function M.setup(config)
     if vim.fn.executable("hc") == 0 then
         vim.notify("hc is not on PATH. Install herdr-core before calling setup().", vim.log.levels.ERROR)
         return {}
+    end
+    local given = config.resources or { require("herdr-core.resources").terminals() }
+    local problem = require("herdr-core.core.sidebar").problem(given)
+    if problem then
+        vim.notify("herdr-core resources: " .. problem, vim.log.levels.ERROR)
+        return {}
+    end
+    -- The terminals' keys moved to their resource when the terminals became one.
+    if (config --[[@as table]]).sidebar_keys then
+        vim.notify(
+            "herdr-core: sidebar_keys is no longer used. Pass the keys to require('herdr-core.resources').terminals({ keys = ... }) in resources.",
+            vim.log.levels.WARN
+        )
     end
     if stop_previous then stop_previous() end
     local hc = require("herdr-core.adapter.hc")
@@ -81,6 +94,53 @@ function M.setup(config)
         end
         vim.api.nvim_set_current_buf(buffer_for(effect.terminal))
     end
+    ---@param root string?
+    local function start(root)
+        dispatch({
+            type = "new_terminal_requested",
+            placement = "tab",
+            tab = identifier(),
+            space_root = root,
+            editor_folder = vim.fn.getcwd()
+        })
+    end
+    ---@param ctx HerdrCoreActionContext
+    ---@return table
+    local function props(ctx)
+        return assert(ctx.item.props)
+    end
+    -- What the items of `terminals` can do. Each passes the event for it to the core.
+    ---@type table<string, HerdrCoreResourceAction>
+    local terminal_actions = {
+        open = function (ctx)
+            local windows = {}
+            for _, window in ipairs(vim.api.nvim_list_wins()) do
+                local address = vim.b[vim.api.nvim_win_get_buf(window)].herdr_core_address
+                if address then windows[address] = tostring(window) end
+            end
+            dispatch({ type = "terminal_chosen", terminal = props(ctx).address, windows = windows })
+        end,
+        rename = function (ctx)
+            require("herdr-core.ui.prompt").name(ctx.item.name, function (name)
+                if name ~= nil then
+                    dispatch({ type = "terminal_named", terminal = props(ctx).address, name = name })
+                end
+            end)
+        end,
+        pin = function (ctx)
+            dispatch({ type = "terminal_pinned", terminal = props(ctx).address, pinned = not props(ctx).is_pinned })
+        end,
+        unread = function (ctx) dispatch({ type = "unread_requested", terminal = props(ctx).address }) end,
+        new_terminal = function (ctx) start(props(ctx).space) end
+    }
+    -- The definitions go to the core as given; `terminals` gets its actions here, where they can reach the core.
+    ---@type HerdrCoreResource[]
+    local listed = vim.tbl_map(function (resource)
+        if resource.name ~= "terminals" then return resource end
+        return vim.tbl_extend("keep", { actions = terminal_actions }, resource)
+    end, given)
+    local monitors = require("herdr-core.adapter.resources").new(dispatch, report)
+    stops[#stops + 1] = monitors.stop
     local sidebar = require("herdr-core.ui.sidebar").create(function (action, row, value)
         if not row then return end
         if row.kind:find("^setup_") then
@@ -91,68 +151,40 @@ function M.setup(config)
             elseif row.action == "dismiss" then
                 dispatch({ type = "setup_dismissed" })
             end
-            return
-        end
-        if action == "activate" then
-            if row.kind ~= "terminal" then
-                if row.kind == "machine" and row.id then dispatch({ type = "machine_toggled", id = row.id }) end
-                return
-            end
-            local windows = {}
-            for _, window in ipairs(vim.api.nvim_list_wins()) do
-                local address = vim.b[vim.api.nvim_win_get_buf(window)].herdr_core_address
-                if address then windows[address] = tostring(window) end
-            end
-            dispatch({ type = "terminal_chosen", terminal = row.address, windows = windows })
-        elseif action == "rename" then
-            dispatch({ type = "terminal_named", terminal = row.address, name = value })
-        elseif action == "pin" then
-            local record = loop.state().terminals[row.address]
-            dispatch({ type = "terminal_pinned", terminal = row.address, pinned = not record.labels["herdr.pinned"] })
-        elseif action == "unread" then
-            dispatch({ type = "unread_requested", terminal = row.address })
-        elseif action == "new_terminal" then
-            ---@param root string?
-            local function start(root)
-                dispatch({
-                    type = "new_terminal_requested",
-                    placement = "tab",
-                    tab = identifier(),
-                    space_root = root,
-                    editor_folder = vim.fn.getcwd()
-                })
-            end
-            if row.kind == "new_terminal" then
-                ---@type HerdrCoreChoice[]
-                local places = {}
-                ---@param path string
-                local function offer(path)
-                    path = vim.fs.normalize(path)
-                    for _, place in ipairs(places) do
-                        if place.path == path then return end
-                    end
-                    places[#places + 1] = { label = vim.fn.fnamemodify(path, ":~"), path = path }
+        elseif row.kind == "new_terminal" then
+            ---@type HerdrCoreChoice[]
+            local places = {}
+            ---@param path string
+            local function offer(path)
+                path = vim.fs.normalize(path)
+                for _, place in ipairs(places) do
+                    if place.path == path then return end
                 end
-                offer(vim.fn.getcwd())
-                local home = vim.fn.expand("~") --[[@as string]]
-                offer(home)
-                local _, rows = core.view(loop.state())
-                for _, space in ipairs(rows) do
-                    -- A shell starts on this machine, so other machines' spaces are left out.
-                    if space.kind == "space" and space.root and not space.machine then
-                        offer(space.root)
-                    end
-                end
-                local picker = config.picker or require("herdr-core.ui.prompt").choose
-                picker(places, { prompt = "New terminal" }, function (place)
-                    if place then start(place.path) end
-                end)
-                return
+                places[#places + 1] = { label = vim.fn.fnamemodify(path, ":~"), path = path }
             end
-            local record = row.address and loop.state().terminals[row.address]
-            start(row.root or (record and record.labels["herdr.space"]))
+            offer(vim.fn.getcwd())
+            local home = vim.fn.expand("~") --[[@as string]]
+            offer(home)
+            local _, rows = core.view(loop.state())
+            for _, space in ipairs(rows) do
+                -- The sections of `terminals` are the spaces; their ids are the spaces' roots.
+                if space.kind == "section" and space.resource == "terminals" and space.id then offer(space.id) end
+            end
+            local picker = config.picker or require("herdr-core.ui.prompt").choose
+            picker(places, { prompt = "New terminal" }, function (place)
+                if place then start(place.path) end
+            end)
+        elseif row.kind == "item" then
+            -- Enter and a click are the key `use`.
+            dispatch({
+                type = "key_pressed",
+                resource = row.resource,
+                key = action == "key" and value or "use",
+                item = row.item,
+                parent = row.parent
+            })
         end
-    end, config.sidebar_keys)
+    end)
     -- Resume commands are typed one after another, a little apart, as Herdr TUI does.
     local next_resume = 0
     local handlers = {
@@ -221,6 +253,8 @@ function M.setup(config)
                 end)
             end)
         end,
+        sync_monitors = function (effect) monitors.sync(effect) end,
+        run_action = function (effect) effect.run(effect.ctx) end,
         sidebar = function (effect)
             if effect.action == "focus" then
                 vim.api.nvim_set_current_win(sidebar.show())
@@ -237,7 +271,8 @@ function M.setup(config)
                 local definition = resolved[agent]
                 return definition ~= nil and definition.matches_program ~= nil
                     and not definition.matches_program(program)
-            end
+            end,
+            resources = listed
         }),
         handlers = handlers,
         render = sidebar.render,

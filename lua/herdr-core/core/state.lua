@@ -24,17 +24,34 @@ local M = {}
 ---@field shown      string[]
 ---@field read       table<string, integer>
 ---@field open?      fun(terminal: string): HerdrCoreOpenEffect
----@field folded     table<string, true>
 ---@field listed?    boolean                                    Whether the terminal list from the core has arrived.
 ---@field restored?  boolean                                    Whether the saved layout has been restored with that list.
 ---@field sidebar?   HerdrCoreSidebarState
 ---@field setup      HerdrCoreSetupState
 ---@field resuming   table<string, true>                        Terminals already asked to resume.
 ---@field resumable? HerdrCoreResumable
+---@field resources  HerdrCoreResource[]                        What the sidebar lists, in order.
+---@field items      HerdrCoreListed                            What the resources' monitors notified.
+---@field monitored  HerdrCoreWanted                            The elements monitors were last asked to be armed for.
+---@field front?     string                                     The terminal in front in the current tabpage.
 
----@class HerdrCoreMachineToggled
----@field type 'machine_toggled'
----@field id   string
+-- What monitors notified, each list for one resource under one element.
+---@class HerdrCoreItemsListed
+---@field type  'items_listed'
+---@field lists { resource: string, parent: string, items: HerdrCoreElement[] } []
+
+---@class HerdrCoreKeyPressed
+---@field type     'key_pressed'
+---@field resource string
+---@field key      string
+---@field item     HerdrCoreItem
+---@field parent?  HerdrCoreElement
+
+-- Monitors to arm with the element they list under, and monitors to disarm.
+---@class HerdrCoreSyncMonitors
+---@field type   'sync_monitors'
+---@field arm    { resource: string, key: string, monitor: (fun(): HerdrCoreMonitor), parent?: HerdrCoreElement } []
+---@field disarm { resource: string, key: string } []
 
 ---@class HerdrCoreNewTerminalRequested
 ---@field type             'new_terminal_requested'
@@ -51,14 +68,15 @@ local M = {}
 ---@class HerdrCoreStateOptions
 ---@field open?      fun(terminal: string): HerdrCoreOpenEffect
 ---@field resumable? HerdrCoreResumable
+---@field resources? HerdrCoreResource[]
 
 ---@class HerdrCoreTerminalChosen
 ---@field type     'terminal_chosen'
 ---@field terminal string
 ---@field windows  table<string, string>
 
----@alias HerdrCoreEvent HerdrCoreSetupChecked | HerdrCoreSetupRequested | HerdrCoreSetupResult | HerdrCoreSetupDismissed | HerdrCoreSidebarRequested | HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreMachineToggled | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict
----@alias HerdrCoreEffect HerdrCoreResumeEffect | HerdrCoreInstallEffect | HerdrCoreSidebarEffect | HerdrCoreSetLabel | HerdrCoreSpaceEffect | HerdrCoreLayoutEffect | HerdrCoreOpenEffect | HerdrCoreNotify | HerdrCoreRunShell
+---@alias HerdrCoreEvent HerdrCoreSetupChecked | HerdrCoreSetupRequested | HerdrCoreSetupResult | HerdrCoreSetupDismissed | HerdrCoreSidebarRequested | HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreItemsListed | HerdrCoreKeyPressed | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict
+---@alias HerdrCoreEffect HerdrCoreResumeEffect | HerdrCoreInstallEffect | HerdrCoreSidebarEffect | HerdrCoreSetLabel | HerdrCoreSpaceEffect | HerdrCoreLayoutEffect | HerdrCoreOpenEffect | HerdrCoreNotify | HerdrCoreRunShell | HerdrCoreSyncMonitors | HerdrCoreRunAction
 
 ---@class HerdrCoreUnknownEvent
 ---@field type 'unknown'
@@ -67,6 +85,7 @@ local M = {}
 ---@field type      'focus_changed'
 ---@field focused   boolean
 ---@field terminals string[]
+---@field front?    string          The terminal in front in the current tabpage.
 
 ---@param options? HerdrCoreStateOptions
 ---@return HerdrCoreState
@@ -78,11 +97,13 @@ function M.new(options)
         focused = true,
         shown = {},
         read = {},
-        folded = {},
         setup = setup.new(),
         resuming = {},
         open = options and options.open,
-        resumable = options and options.resumable
+        resumable = options and options.resumable,
+        resources = options and options.resources or { { name = "terminals" } },
+        items = {},
+        monitored = {}
     }
 end
 
@@ -94,9 +115,9 @@ local function with(state, changes)
 end
 
 ---@param state HerdrCoreState
----@param event HerdrCoreSetupChecked | HerdrCoreSetupRequested | HerdrCoreSetupResult | HerdrCoreSetupDismissed | HerdrCoreSidebarRequested | HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreMachineToggled | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict | HerdrCoreUnknownEvent
+---@param event HerdrCoreSetupChecked | HerdrCoreSetupRequested | HerdrCoreSetupResult | HerdrCoreSetupDismissed | HerdrCoreSidebarRequested | HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreItemsListed | HerdrCoreKeyPressed | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict | HerdrCoreUnknownEvent
 ---@return HerdrCoreState, HerdrCoreEffect[]
-function M.update(state, event)
+local function step(state, event)
     if event.type == "setup_checked" or event.type == "setup_requested"
         or event.type == "setup_result" or event.type == "setup_dismissed" then
         local next_setup, effects = setup.update(state.setup, event)
@@ -118,10 +139,16 @@ function M.update(state, event)
         }
         return state, { open.new_terminal(context, event.placement, event.tab) }
     end
-    if event.type == "machine_toggled" then
-        local folded = vim.deepcopy(state.folded)
-        folded[event.id] = not folded[event.id] or nil
-        return with(state, { folded = folded }), {}
+    if event.type == "items_listed" then
+        local items = state.items
+        for _, list in ipairs(event.lists) do
+            local theirs = vim.tbl_extend("force", items[list.resource] or {}, { [list.parent] = list.items })
+            items = vim.tbl_extend("force", items, { [list.resource] = theirs })
+        end
+        return with(state, { items = items }), {}
+    end
+    if event.type == "key_pressed" then
+        return state, sidebar.press(state.resources, event)
     end
     if event.type == "terminal_chosen" then
         return state, { open.choose(event.terminal, event.windows, state.open) }
@@ -137,7 +164,8 @@ function M.update(state, event)
                 vim.list_extend(effects, marks)
             end
         end
-        return with(state, { focused = event.focused, shown = event.terminals, read = read }), effects
+        return with(state, { focused = event.focused, shown = event.terminals, read = read, front = event.front }),
+            effects
     end
     if event.type == "layout_loaded" or event.type == "layout_changed" or event.type == "layout_conflict" then
         -- Only the startup restore drops unknown terminals: a later load can name a terminal whose start event is still on its way.
@@ -242,18 +270,77 @@ function M.update(state, event)
     return state, {}
 end
 
+-- What the sidebar is built from.
+---@param state HerdrCoreState
+---@return HerdrCoreSidebarOptions
+local function listing(state)
+    return { resources = state.resources, items = state.items, front = state.front }
+end
+
+-- Keeps the monitors on the elements they are wanted for: asks to arm one where an element is new or has
+-- changed and to disarm one where it is gone, and drops what was listed under elements that are gone.
+---@param state HerdrCoreState
+---@return HerdrCoreState, HerdrCoreSyncMonitors[]
+local function monitors(state)
+    local watched = vim.tbl_filter(function (resource) return resource.monitor ~= nil end, state.resources)
+    if #watched == 0 then return state, {} end
+    ---@type HerdrCoreSyncMonitors
+    local sync = { type = "sync_monitors", arm = {}, disarm = {} }
+    -- Dropping what was listed under an element takes away the elements listed there, so look again after it.
+    local dropped = true
+    while dropped do
+        dropped = false
+        local _, _, wanted = sidebar.update(state.sidebar, vim.tbl_values(state.terminals), listing(state))
+        local items = state.items
+        for _, resource in ipairs(watched) do
+            local name = resource.name
+            local now, before = wanted[name] or {}, state.monitored[name] or {}
+            local keys = vim.tbl_keys(now)
+            table.sort(keys)
+            for _, key in ipairs(keys) do
+                if before[key] == nil or not vim.deep_equal(before[key], now[key]) then
+                    sync.arm[#sync.arm + 1] = {
+                        resource = name,
+                        key = key,
+                        monitor = assert(resource.monitor),
+                        parent = now[key] or nil
+                    }
+                end
+            end
+            local gone = vim.tbl_filter(function (key) return now[key] == nil end, vim.tbl_keys(before))
+            table.sort(gone)
+            for _, key in ipairs(gone) do
+                sync.disarm[#sync.disarm + 1] = { resource = name, key = key }
+            end
+            local kept = vim.tbl_extend("force", {}, items[name] or {})
+            for key in pairs(items[name] or {}) do
+                if now[key] == nil then
+                    kept[key] = nil
+                    dropped = true
+                end
+            end
+            items = vim.tbl_extend("force", items, { [name] = kept })
+        end
+        state = with(state, { monitored = wanted, items = dropped and items or state.items })
+    end
+    if #sync.arm == 0 and #sync.disarm == 0 then return state, {} end
+    return state, { sync }
+end
+
+---@param state HerdrCoreState
+---@param event HerdrCoreEvent | HerdrCoreUnknownEvent
+---@return HerdrCoreState, HerdrCoreEffect[]
+function M.update(state, event)
+    local stepped, effects = step(state, event)
+    local synced, sync = monitors(stepped)
+    if #sync == 0 then return synced, effects end
+    return synced, vim.list_extend(vim.list_extend({}, effects), sync)
+end
+
 ---@param state HerdrCoreState
 ---@return HerdrCoreState, HerdrCoreSidebarRow[], integer
 function M.view(state)
-    local list = vim.tbl_values(state.terminals)
-    local order, rows = sidebar.update(state.sidebar, list, { folded = state.folded })
-    -- Count from the terminals, not the rows: a folded machine hides its rows.
-    local waiting = 0
-    for _, terminal in ipairs(list) do
-        if attention.display(terminal, terminals.is_child(state.terminals, terminal)).waiting then
-            waiting = waiting + 1
-        end
-    end
+    local order, rows, _, waiting = sidebar.update(state.sidebar, vim.tbl_values(state.terminals), listing(state))
     vim.list_extend(rows, setup.view(state.setup))
     return with(state, { sidebar = order }), rows, waiting
 end

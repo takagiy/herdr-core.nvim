@@ -12,10 +12,12 @@ A TUI client for [herdr-core](https://github.com/herdrdev/herdr-core), built on 
 - Restores terminal layouts when Neovim restarts.
 - Automatically resumes agent conversations after a reboot.
 - Built-in integrations for Claude Code, Codex, Antigravity CLI, Copilot CLI, Cursor CLI, Droid, Grok, Kilo Code, Mastra Code, omp, opencode, pi, Qoder CLI and Qwen Code. You can [write your own](#custom-integrations).
+- Lists your own items in the sidebar, under a terminal or in a section of their own. See [Custom resources](#custom-resources).
 
 ## Limitations
 
 - Session restoring plugins (e.g. persisted.nvim, auto-session) may conflict with this plugin. Terminal sessions can be restored with this plugin.
+- Terminals on other machines are not listed in the sidebar yet.
 
 ## Usage
 
@@ -52,13 +54,12 @@ The plugin maps no global keys.
             auto_insert = true,
             -- Width of the sidebar.
             sidebar_width = 24,
-            -- Keys inside the sidebar.
-            sidebar_keys = {
-                activate = "<CR>",
-                new_terminal = "n",
-                rename = "r",
-                pin = "p",
-                unread = "u",
+            -- What the sidebar lists, in order. See Custom resources below.
+            resources = {
+                -- The spaces with their terminals, and what a key does on a terminal.
+                require("herdr-core.resources").terminals({
+                    keys = { use = "open", n = "new_terminal", r = "rename", p = "pin", u = "unread" },
+                }),
             },
             -- Custom how notifications are sent.
             notify = function(name, status)
@@ -81,6 +82,8 @@ The plugin maps no global keys.
 }
 ```
 
+In the terminals' `keys`, the actions are `open`, `rename`, `pin`, `unread` and `new_terminal`. `use` stands for Enter and a click. `sidebar_keys` is no longer used.
+
 ### Statusline
 
 If you use a statusline plugin, e.g. lualine, turn it off for the sidebar:
@@ -93,6 +96,87 @@ require("lualine").setup({
 })
 ```
 
+### Custom resources
+
+A resource lists sections and items in the sidebar. The sidebar draws them like its own rows.
+
+```lua
+local resources = require("herdr-core.resources")
+local Section, Item = resources.Section, resources.Item
+
+require("herdr-core").setup({
+    resources = {
+        resources.terminals(),
+        -- Lists items under each terminal.
+        {
+            name = "tasks",
+            -- `terminals[]` is each space, `terminals[][]` each terminal in a space,
+            -- `terminals[][][]` each terminal one of those started.
+            parent = "terminals[][]",
+            -- Makes the monitor of one parent. It is called once for each parent.
+            monitor = function()
+                local timer
+                return {
+                    -- Called when the parent appears and each time it changes.
+                    -- ctx.parent is the parent. A terminal's props hold address, space and is_pinned.
+                    arm = function(ctx)
+                        if timer then return end
+                        timer = assert(vim.uv.new_timer())
+                        timer:start(0, 5000, function()
+                            -- Replaces what this resource lists under the parent.
+                            -- ctx.notify can be called from any callback.
+                            ctx.notify({
+                                Item({
+                                    name = "T12",
+                                    -- Optional: a second line, a status icon, a count, a background,
+                                    -- items one level deeper, and whatever your actions need.
+                                    detail = "fix login",
+                                    status = "working", -- or "blocked", "error", "done", "idle"
+                                    notification_count = 1,
+                                    is_highlighted = false,
+                                    items = { Item({ name = "write the test" }) },
+                                    props = { number = 12 },
+                                }),
+                            })
+                        end)
+                    end,
+                    -- Called once, when the parent goes away or the plugin stops.
+                    disarm = function()
+                        if timer then
+                            timer:stop()
+                            timer:close()
+                        end
+                    end,
+                }
+            end,
+            actions = {
+                open = function(ctx)
+                    -- ctx.item is the item as you notified it.
+                    -- ctx.parent is the terminal it is under.
+                end,
+            },
+            -- A key runs an action by name, or a function. Only on this resource's items.
+            keys = { use = "open", d = function(ctx) ... end },
+        },
+        -- Without a parent, lists what it notifies at the top, in the order of `resources`.
+        {
+            name = "notes",
+            monitor = function()
+                return {
+                    arm = function(ctx)
+                        ctx.notify({ Section({ name = "Notes", items = { Item({ name = "call back" }) } }) })
+                    end,
+                    disarm = function() end,
+                }
+            end,
+        },
+    },
+})
+```
+
+- A resource with a parent notifies items. Without a parent it notifies sections, items, or both; an item at the top has no heading.
+- An element with an `id` stays the same element across notifications. Give one to what other resources list under.
+- `arm` decides by itself whether to watch something else when the parent has changed.
 ### Custom integrations
 
 ```lua

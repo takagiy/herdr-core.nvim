@@ -27,7 +27,7 @@ Neovim, the plugin, hc, the Node.js dummy agent, the shell and the notification 
   - [x] When the user presses the keys for a new terminal in a tab, a vertical split and a horizontal split, the plugin can open a working shell in each place.
   - [x] When a new shell is opened from a terminal window, it can start in that terminal's current folder, including folders with spaces and Japanese names.
   - [x] When a new shell is opened from a file window, it can start in Neovim's current folder.
-  - [x] When a new shell is opened with `n` on a space heading, or with New terminal and that space chosen, it can start in that space's folder.
+  - [x] When a new shell is opened with `n` on a terminal, or with New terminal and that terminal's space chosen, it can start in that space's folder.
 
 ## Sidebar
 

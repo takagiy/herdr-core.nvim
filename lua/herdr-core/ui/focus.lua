@@ -3,6 +3,7 @@ local M = {}
 ---@class HerdrCoreFocusSnapshot
 ---@field focused   boolean
 ---@field terminals string[]
+---@field front?    string   The terminal in front in the current tabpage.
 
 ---@param callback fun(value: HerdrCoreFocusSnapshot)
 ---@return fun()
@@ -21,7 +22,12 @@ function M.watch(callback)
                 seen[address] = true
             end
         end
-        callback({ focused = focused, terminals = terminals })
+        -- The terminal in front stays the one last shown while the cursor is in the sidebar.
+        local current = vim.api.nvim_get_current_buf()
+        if not vim.b[current].herdr_core_sidebar then
+            vim.t.herdr_core_active_terminal = vim.b[current].herdr_core_address
+        end
+        callback({ focused = focused, terminals = terminals, front = vim.t.herdr_core_active_terminal })
     end
     vim.api.nvim_create_autocmd({ "FocusGained", "FocusLost" }, {
         group = group,
