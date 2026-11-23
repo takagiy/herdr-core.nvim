@@ -1,0 +1,36 @@
+name: Tests
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        timeout-minutes: 2
+        with:
+          persist-credentials: false
+
+      # The same way scripts/e2e-linux.sh gets mise.
+      - name: Install the tools in mise.toml
+        timeout-minutes: 5
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          curl -fsSL https://mise.run | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/mise" trust --quiet
+          "$HOME/.local/bin/mise" install
+
+      - name: Run the tests
+        timeout-minutes: 8
+        run: mise run test
