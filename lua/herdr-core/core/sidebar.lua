@@ -46,6 +46,12 @@ local terminals_module = require("herdr-core.core.terminals")
 ---@field actions? table<string, HerdrCoreResourceAction>
 ---@field keys?    table<string, string | HerdrCoreResourceAction> What a key does on the items; `use` stands for Enter and a click.
 
+-- An action of a resource as the menu of its items offers it.
+---@class HerdrCoreSidebarChoice
+---@field action string   The action's name.
+---@field label  string   The name as the menu shows it.
+---@field keys   string[] The keys that run it, besides Enter and a click.
+
 ---@class HerdrCoreSidebarRow
 ---@field kind         'section' | 'item' | 'summary' | 'new_terminal' | 'setup_heading' | 'setup_button' | 'setup_text' | 'setup_item' | 'setup_error'
 ---@field status       string?
@@ -61,6 +67,7 @@ local terminals_module = require("herdr-core.core.terminals")
 ---@field action?      'install' | 'install_all' | 'dismiss'
 ---@field resource?    string                                                                                                                           The name of the resource the row's element belongs to.
 ---@field keys?        table<string, string | HerdrCoreResourceAction>                                                                                  The keys the row takes.
+---@field menu?        HerdrCoreSidebarChoice[]                                                                                                         What the row's menu offers, in order.
 ---@field item?        HerdrCoreElement                                                                                                                 The element the row shows.
 ---@field parent?      HerdrCoreElement                                                                                                                 The element the row's element is listed under.
 
@@ -271,6 +278,23 @@ local function spaces(previous, terminals, front)
     return state, sections
 end
 
+-- What the menu of a resource's items offers: its actions by name, the one Enter and a click run first.
+---@param resource HerdrCoreResource
+---@return HerdrCoreSidebarChoice[]
+local function choices(resource)
+    local keys = resource.keys or {}
+    local names = vim.tbl_keys(resource.actions or {})
+    table.sort(names, function (a, b)
+        if (a == keys.use) ~= (b == keys.use) then return a == keys.use end
+        return a < b
+    end)
+    return vim.tbl_map(function (name)
+        local bound = vim.tbl_filter(function (key) return key ~= "use" and keys[key] == name end, vim.tbl_keys(keys))
+        table.sort(bound)
+        return { action = name, label = (name:gsub("_", " ")), keys = bound }
+    end, names)
+end
+
 -- The rows of the sidebar, the elements monitors are wanted for, and the number that waits for the user.
 ---@param previous? HerdrCoreSidebarState
 ---@param terminals HerdrCoreTerminal[]
@@ -285,10 +309,13 @@ function M.update(previous, terminals, options)
     local rows = {}
     ---@type HerdrCoreWanted
     local wanted = {}
+    ---@type table<string, HerdrCoreSidebarChoice[]>
+    local menus = {}
     for _, resource in ipairs(resources) do
         if resource.monitor then
             wanted[resource.name] = {}
         end
+        menus[resource.name] = choices(resource)
     end
     ---@param list?    HerdrCoreElement[]
     ---@param resource HerdrCoreResource
@@ -356,6 +383,7 @@ function M.update(previous, terminals, options)
                     top = top,
                     resource = node.resource.name,
                     keys = node.resource.keys,
+                    menu = menus[node.resource.name],
                     item = element,
                     parent = node.parent
                 }
@@ -390,15 +418,15 @@ end
 ---@field run  HerdrCoreResourceAction
 ---@field ctx  HerdrCoreActionContext
 
--- What a key pressed on an item asks for: the function given for the key, or the action of the item's
--- resource that the key names, to be run with the item.
+-- What a key pressed on an item, or an action chosen from its menu, asks for: the function given for the
+-- key, or the action of the item's resource that is named, to be run with the item.
 ---@param resources HerdrCoreResource[]
----@param event     { resource: string, key: string, item: HerdrCoreItem, parent?: HerdrCoreElement }
+---@param event     { resource: string, key?: string, action?: string, item: HerdrCoreItem, parent?: HerdrCoreElement }
 ---@return HerdrCoreRunAction[]
 function M.press(resources, event)
     for _, resource in ipairs(resources) do
         if resource.name == event.resource then
-            local found = (resource.keys or {})[event.key]
+            local found = event.action or (resource.keys or {})[event.key]
             local run = type(found) == "function" and found or (resource.actions or {})[found]
             if type(run) == "function" then
                 return { { type = "run_action", run = run, ctx = { item = event.item, parent = event.parent } } }

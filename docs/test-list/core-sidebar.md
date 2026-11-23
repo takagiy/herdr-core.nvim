@@ -31,3 +31,4 @@ The rows the sidebar shows.
 - [x] When an element has an id, the sidebar can keep it apart by the id wherever it is listed.
 - [x] When a key is pressed on an item, the sidebar can ask for the function to be run with the item: the one given for the key, or the action its resource names for it.
 - [x] When resources cannot be used, `problem` can say which one and why.
+- [x] When an item's row is made, it can carry the menu of its resource's actions: the one Enter and a click run first, the rest by name, each with its label and the keys that run it.

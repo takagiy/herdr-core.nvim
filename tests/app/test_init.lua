@@ -462,6 +462,41 @@ T["takes the terminals' keys from their resource"] = function ()
     MiniTest.expect.equality(child.lua_get("told"), true)
 end
 
+-- When the user chooses an action from the menu of a terminal, `setup` can run it on that terminal.
+T["runs the action chosen from a terminal's menu"] = function ()
+    -- Given a terminal in the sidebar
+    child.lua(fake)
+    child.lua(on_line)
+    child.lua(
+        [[
+        vim.o.mouse = 'a'
+        labels = {}
+        package.loaded['herdr-core.adapter.hc'].label = function (address, key, value, callback)
+            labels[#labels + 1] = { address, key, value }
+            callback(nil)
+        end
+        require('herdr-core').setup({ auto_insert = false })
+    ]]
+    )
+    -- When the terminal is right-clicked and p is pressed in the menu
+    child.lua(
+        [[on_line('t1')
+        local pos = vim.fn.screenpos(0, vim.api.nvim_win_get_cursor(0)[1], 1)
+        vim.api.nvim_input_mouse('right', 'press', '', 0, pos.row - 1, pos.col - 1)]]
+    )
+    child.lua([[vim.wait(1000, function () return vim.api.nvim_win_get_config(0).relative ~= '' end)]])
+    local offered = child.lua_get(
+        [[vim.tbl_map(
+            function (line) return (vim.trim(line):gsub('%s%s+', ' | ')) end, vim.api.nvim_buf_get_lines(0, 0, -1, false)
+        )]]
+    )
+    child.type_keys("p")
+    child.lua([[vim.wait(1000, function () return #labels > 0 end)]])
+    -- Then the menu offered the terminal's actions with their keys, open first, and the terminal is pinned
+    MiniTest.expect.equality(offered, { "open", "new terminal | n", "pin | p", "rename | r", "unread | u" })
+    MiniTest.expect.equality(child.lua_get("labels"), { { "t1", "herdr.pinned", "1" } })
+end
+
 -- When a resource cannot be used, `setup` can tell the user why and leave Neovim as it is.
 T["tells the user and leaves Neovim as it is when a resource names no parent that exists"] = function ()
     -- Given a resource whose parent names no resource

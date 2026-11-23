@@ -50,6 +50,8 @@
 - action は `ctx` を受け取る。`ctx.item` はその Item、`ctx.parent` は 1 つ上の要素。
 - `terminals` の動作は、`open`、`rename`、`pin`、`unread`、`new_terminal`。`keys` を省略すると、Enter とクリックで `open`、`n`、`r`、`p`、`u` でほかの動作を使う。
 - `setup` の `sidebar_keys` は廃止する。設定に残っていたら、`resources.terminals({ keys = ... })` に移すよう通知する。
+- Item を右クリックすると、そのリソースの `actions` を並べたメニューを、ポインターの位置に開く。キーを割り当てていない action も並ぶ。`use` の action を先頭にし、残りは名前順に並べる。名前の `_` は空白にして表示し、右側に割り当てたキーを出す。
+- メニューの中では、Enter でカーソル行の action を、action のキーでその action を実行する。`q`、Esc、ウィンドウの外のクリックは、何も実行せずに閉じる。`keys` に関数を直接書いたものは、名前がないのでメニューに出ない。
 
 ### データの流れ
 
@@ -57,6 +59,7 @@
 - **モニターの管理**: core が、どの親にモニターが要るかを state から求め、変わった分だけを effect（`sync_monitors`）で adapter に伝える。張っているインスタンスは adapter が持つ。
 - **描画**: `view` は、state だけから行を作る。行は関数を持たない。
 - **キー**: ui が行とキーを報告し、app が event（`key_pressed`）にする。core がキーを関数まで解決して effect（`run_action`）を返し、app が呼ぶ。`terminals` の action は、いままでの event（`terminal_chosen` など）を dispatch する。
+- **メニュー**: core が、行に action の一覧（名前、表示名、キー）を持たせる。ui は選ばれた action の名前を報告し、app が event（`action_chosen`）にする。そこから先はキーと同じ。
 - **定義**: 定義は、関数ごと core の state に置く。core は、その関数を呼ばない。
 
 ## 結果
@@ -90,3 +93,4 @@
 - core が、利用者の関数を直接呼ぶ。ターミナルと流れが変わり、core が外部の状態に依存する。
 - machine を、Section を含む Section で表す。見出しの種類が増える。machine は別のリソースにする。
 - `sidebar_keys` を残して、`terminals` の `keys` に変換する。同じことを書く方法が 2 つになる。
+- メニューで、`use` の action のキーとして Enter を表示する。メニューの中の Enter はカーソル行の実行なので、表示と食い違う。

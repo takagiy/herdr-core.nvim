@@ -47,6 +47,14 @@ local M = {}
 ---@field item     HerdrCoreItem
 ---@field parent?  HerdrCoreElement
 
+-- An action chosen from the menu of an item.
+---@class HerdrCoreActionChosen
+---@field type     'action_chosen'
+---@field resource string
+---@field action   string
+---@field item     HerdrCoreItem
+---@field parent?  HerdrCoreElement
+
 -- Monitors to arm with the element they list under, and monitors to disarm.
 ---@class HerdrCoreSyncMonitors
 ---@field type   'sync_monitors'
@@ -75,7 +83,7 @@ local M = {}
 ---@field terminal string
 ---@field windows  table<string, string>
 
----@alias HerdrCoreEvent HerdrCoreSetupChecked | HerdrCoreSetupRequested | HerdrCoreSetupResult | HerdrCoreSetupDismissed | HerdrCoreSidebarRequested | HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreItemsListed | HerdrCoreKeyPressed | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict
+---@alias HerdrCoreEvent HerdrCoreSetupChecked | HerdrCoreSetupRequested | HerdrCoreSetupResult | HerdrCoreSetupDismissed | HerdrCoreSidebarRequested | HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreItemsListed | HerdrCoreKeyPressed | HerdrCoreActionChosen | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict
 ---@alias HerdrCoreEffect HerdrCoreResumeEffect | HerdrCoreInstallEffect | HerdrCoreSidebarEffect | HerdrCoreSetLabel | HerdrCoreSpaceEffect | HerdrCoreLayoutEffect | HerdrCoreOpenEffect | HerdrCoreNotify | HerdrCoreRunShell | HerdrCoreSyncMonitors | HerdrCoreRunAction
 
 ---@class HerdrCoreUnknownEvent
@@ -115,7 +123,7 @@ local function with(state, changes)
 end
 
 ---@param state HerdrCoreState
----@param event HerdrCoreSetupChecked | HerdrCoreSetupRequested | HerdrCoreSetupResult | HerdrCoreSetupDismissed | HerdrCoreSidebarRequested | HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreItemsListed | HerdrCoreKeyPressed | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict | HerdrCoreUnknownEvent
+---@param event HerdrCoreSetupChecked | HerdrCoreSetupRequested | HerdrCoreSetupResult | HerdrCoreSetupDismissed | HerdrCoreSidebarRequested | HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreItemsListed | HerdrCoreKeyPressed | HerdrCoreActionChosen | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict | HerdrCoreUnknownEvent
 ---@return HerdrCoreState, HerdrCoreEffect[]
 local function step(state, event)
     if event.type == "setup_checked" or event.type == "setup_requested"
@@ -147,7 +155,7 @@ local function step(state, event)
         end
         return with(state, { items = items }), {}
     end
-    if event.type == "key_pressed" then
+    if event.type == "key_pressed" or event.type == "action_chosen" then
         return state, sidebar.press(state.resources, event)
     end
     if event.type == "terminal_chosen" then

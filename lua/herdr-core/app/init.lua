@@ -174,6 +174,14 @@ function M.setup(config)
             picker(places, { prompt = "New terminal" }, function (place)
                 if place then start(place.path) end
             end)
+        elseif row.kind == "item" and action == "action" then
+            dispatch({
+                type = "action_chosen",
+                resource = row.resource,
+                action = value,
+                item = row.item,
+                parent = row.parent
+            })
         elseif row.kind == "item" then
             -- Enter and a click are the key `use`.
             dispatch({

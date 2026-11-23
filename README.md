@@ -30,6 +30,7 @@ A TUI client for [herdr-core](https://github.com/herdrdev/herdr-core), built on 
 | Select terminal session and press `r` | Name it |
 | Select terminal session and press `p` | Pin it |
 | Select terminal session and press `u` | Mark it unread |
+| Right-click a terminal session | Choose one of these actions from a menu |
 | Select `«` or `»` and press `Enter` / Click it | Toggle the sidebar |
 
 ## Requirements
@@ -177,6 +178,7 @@ require("herdr-core").setup({
 - A resource with a parent notifies items. Without a parent it notifies sections, items, or both; an item at the top has no heading.
 - An element with an `id` stays the same element across notifications. Give one to what other resources list under.
 - `arm` decides by itself whether to watch something else when the parent has changed.
+- A right click on an item opens a menu of its resource's `actions`, with or without keys. A function written in `keys` is not in the menu.
 ### Custom integrations
 
 ```lua

@@ -10,8 +10,8 @@ local T = MiniTest.new_set({
             vim.o.mousemodel = 'extend'
             actions = {}
             editor = vim.api.nvim_get_current_win()
-            sidebar = require('herdr-core.ui.sidebar').create(function(action, row)
-                actions[#actions + 1] = { action, row and row.id }
+            sidebar = require('herdr-core.ui.sidebar').create(function(action, row, value)
+                actions[#actions + 1] = { action, row and row.id, value }
                 if select_terminal then vim.api.nvim_set_current_win(editor) end
             end)
             side = sidebar.show(32)
@@ -45,6 +45,47 @@ T["activates a sidebar item with one click from another window"] = function ()
     -- Then the same click both focuses the sidebar and activates the terminal
     MiniTest.expect.equality(child.api.nvim_get_current_win(), side)
     MiniTest.expect.equality(actions, { { "activate", "t1" } })
+end
+
+-- When an item with a menu is right-clicked, the sidebar can open the menu in place of Neovim's popup menu, with the cursor on the item, and report the action chosen in it.
+-- When a row without a menu is right-clicked, the sidebar can open nothing.
+T["opens an item's menu on a right click and reports the chosen action"] = function ()
+    -- Given Neovim's popup menu on the right button, and an item without a menu
+    child.lua([[vim.o.mousemodel = 'popup_setpos']])
+    local side = child.lua_get("side")
+    ---@param line integer
+    local function right_click(line)
+        local pos = child.fn.screenpos(side, line, 1)
+        child.api.nvim_input_mouse("right", "press", "", 0, pos.row - 1, pos.col - 1)
+        child.lua("vim.cmd.redraw()")
+        child.api.nvim_input_mouse("right", "release", "", 0, pos.row - 1, pos.col - 1)
+        child.lua("vim.cmd.redraw()")
+    end
+    -- When the item is right-clicked, then again once it has a menu, and r is pressed in the menu
+    right_click(3)
+    child.lua([[vim.wait(100, function () return false end)]])
+    local without = child.lua_get("{ vim.api.nvim_win_get_config(0).relative, vim.fn.pumvisible() }")
+    child.lua(
+        [[sidebar.render({ {
+            kind = 'item', id = 't1', lines = { 'review', 'claude' },
+            menu = {
+                { action = 'open', label = 'open', keys = {} }, { action = 'rename', label = 'rename', keys = { 'r' } }
+            }
+        } }, 0)]]
+    )
+    right_click(4)
+    child.lua([[vim.wait(1000, function () return vim.api.nvim_win_get_config(0).relative ~= '' end)]])
+    local opened = child.lua_get(
+        [[{
+            vim.api.nvim_win_get_config(0).relative ~= '', vim.fn.pumvisible(),
+            vim.api.nvim_buf_get_lines(0, 0, -1, false), vim.api.nvim_win_get_cursor(side)[1]
+        }]]
+    )
+    child.type_keys("r")
+    -- Then nothing opened without a menu; with one it opened at the pointer in place of the popup menu, the cursor went to the item's first line, and rename is reported
+    MiniTest.expect.equality(without, { "", 0 })
+    MiniTest.expect.equality(opened, { true, 0, { " open      ", " rename  r " }, 3 })
+    MiniTest.expect.equality(child.lua_get("actions"), { { "action", "t1", "rename" } })
 end
 
 T["lets a click leave the sidebar"] = function ()
