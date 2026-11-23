@@ -153,7 +153,7 @@ function M.create(on_action)
         plain[vim.api.nvim_replace_termcodes(key, true, false, true)] = function () move(direction) end
     end
     plain[vim.api.nvim_replace_termcodes("<CR>", true, false, true)] = function ()
-        activate(assert(vim.api.nvim_win_get_cursor(0)[1]))
+        activate(vim.api.nvim_win_get_cursor(0)[1])
     end
     ---@type table<string, boolean>
     local mapped = {}
@@ -164,7 +164,7 @@ function M.create(on_action)
         if mapped[code] then return end
         mapped[code] = true
         vim.keymap.set("n", key, function ()
-            local row = by_line[assert(vim.api.nvim_win_get_cursor(0)[1])]
+            local row = by_line[vim.api.nvim_win_get_cursor(0)[1]]
             for taken in pairs(row and row.keys or {}) do
                 if vim.api.nvim_replace_termcodes(taken, true, false, true) == code then
                     if on_action then on_action("key", row, taken) end
@@ -184,16 +184,41 @@ function M.create(on_action)
     for _, key in ipairs({ "<LeftRelease>", "<2-LeftRelease>", "<3-LeftRelease>", "<4-LeftRelease>" }) do
         clicks[vim.api.nvim_replace_termcodes(key, true, false, true)] = true
     end
+    local right = vim.api.nvim_replace_termcodes("<RightMouse>", true, false, true)
+    local right_release = vim.api.nvim_replace_termcodes("<RightRelease>", true, false, true)
+    -- Opens the menu of the item on a line, with the cursor moved to the item.
+    ---@param window integer
+    ---@param line   integer
+    local function offer(window, line)
+        local row = by_line[line]
+        local menu = row and row.menu or {}
+        if not row or not on_action or #menu == 0 then return end
+        while by_line[line - 1] == row do
+            line = line - 1
+        end
+        vim.api.nvim_win_set_cursor(window, { line, 0 })
+        require("herdr-core.ui.prompt").menu(row.lines[1] or "", menu, function (index)
+            local choice = index and menu[index]
+            if choice then on_action("action", row, choice.action) end
+        end)
+    end
     -- Observe native clicks so focus can move both into and out of the sidebar. Acting on the release lets a
     -- window opened by the action, such as the place picker, keep the focus the click would otherwise take back.
     vim.on_key(function (key)
-        if not clicks[key] then return end
+        if not clicks[key] and key ~= right and key ~= right_release then return end
         local mouse = vim.fn.getmousepos()
         if mouse.winid == 0 or vim.api.nvim_win_get_buf(mouse.winid) ~= buffer then return end
+        -- The right button opens the item's menu here; dropping the key keeps Neovim's popup menu away.
+        if key == right_release then return "" end
         vim.schedule(function ()
             if not vim.api.nvim_win_is_valid(mouse.winid) or vim.api.nvim_win_get_buf(mouse.winid) ~= buffer then return end
-            activate(mouse.line)
+            if key == right then
+                offer(mouse.winid, mouse.line)
+            else
+                activate(mouse.line)
+            end
         end)
+        if key == right then return "" end
     end, namespace)
     ---@param requested? integer
     ---@return integer

@@ -9,3 +9,6 @@ Asking the user for input.
 - [x] When the user presses Enter or clicks an item, `choose` can return that item.
 - [x] When the user presses Esc or `q`, or leaves the window, `choose` can return nil.
 - [x] When an item is wider than the editor, `choose` can shorten it from the left with `…`, so every item keeps one row.
+- [x] When a menu opens, it can list each choice on a line with its keys at the right, under its title, at the mouse pointer.
+- [x] When a menu is open, the user can run the choice under the cursor with Enter, any choice with its key or a click, and none with q.
+- [x] When a choice takes a key that closes the menu, the menu can run the choice with that key instead of closing without one.

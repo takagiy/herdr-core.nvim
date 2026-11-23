@@ -508,10 +508,17 @@ T["asks to run what a key does on an item"] = function ()
         resources = { { name = "terminals", actions = { open = open }, keys = { use = "open" } } }
     })
     local item = { kind = "item", name = "t1" }
-    -- When Enter is pressed on an item
+    -- When Enter is pressed on an item, and when the action is chosen from the item's menu
     local _, effects = core.update(state, { type = "key_pressed", resource = "terminals", key = "use", item = item })
-    -- Then the action is asked to run with the item
+    local _, chosen = core.update(state, {
+        type = "action_chosen",
+        resource = "terminals",
+        action = "open",
+        item = item
+    })
+    -- Then both ask for the action to run with the item
     MiniTest.expect.equality(effects, { { type = "run_action", run = open, ctx = { item = item } } })
+    MiniTest.expect.equality(chosen, effects)
 end
 
 return T

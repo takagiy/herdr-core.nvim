@@ -29,3 +29,4 @@ The core's single entry point.
 - [x] When an element a monitor is wanted for appears or changes, `update` can ask to arm the monitor there; when it goes, to disarm it and drop what was listed there.
 - [x] When what a monitor notified arrives, `update` can keep it, and `view` can list it.
 - [x] When a key is pressed on an item, `update` can ask to run what the key does there.
+- [x] When an action is chosen from an item's menu, `update` can ask to run it.

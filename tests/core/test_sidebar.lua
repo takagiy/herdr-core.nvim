@@ -433,6 +433,28 @@ T["puts the resource's name and keys, the element and the one above it on a row"
     )
 end
 
+-- When an item's row is made, it can carry the menu of its resource's actions: the one Enter and a click run first, the rest by name, each with its label and the keys that run it.
+T["puts the menu of the resource's actions on an item's row"] = function ()
+    -- Given the terminals' resource with four actions, keys for three of them, and a key holding a function
+    local sidebar = require("herdr-core.core.sidebar")
+    local run = function () end
+    local terminals = {
+        name = "terminals",
+        actions = { rename = run, open = run, new_terminal = run, archive = run },
+        keys = { use = "open", o = "open", r = "rename", n = "new_terminal", d = function () end }
+    }
+    -- When the sidebar is built
+    local _, rows = sidebar.update(nil, { terminal("t1", "/app") }, { resources = { terminals } })
+    -- Then the item's menu starts with the action of Enter, lists the rest by name, and leaves out the function
+    MiniTest.expect.equality(assert(rows[2]).menu, {
+        { action = "open", label = "open", keys = { "o" } },
+        { action = "archive", label = "archive", keys = {} },
+        { action = "new_terminal", label = "new terminal", keys = { "n" } },
+        { action = "rename", label = "rename", keys = { "r" } }
+    })
+    MiniTest.expect.equality(assert(rows[1]).menu, nil)
+end
+
 -- When resources have monitors, the sidebar can say where they are wanted: once without an element for a resource at the top, once for each element of the level for one with a parent.
 -- When an element has an id, the sidebar can keep it apart by the id wherever it is listed.
 T["says where monitors are wanted, telling elements apart by their ids"] = function ()
