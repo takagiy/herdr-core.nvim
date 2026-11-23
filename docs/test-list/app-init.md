@@ -13,3 +13,10 @@ Starting the plugin.
 - [x] When an installed agent lacks its hook, `setup` can show the Setup panel with that integration.
 - [x] When the user presses New terminal, `setup` can offer the Neovim folder, home and this machine's spaces by path without duplicates, and start a shell in the chosen one.
 - [x] When `picker` is set, `setup` can use it in place of the floating window and start nothing when it returns nil.
+- [x] When `resources` holds a definition, `setup` can arm its monitor for each element its parent points at, list what it notifies there, and call its action with the item and its parent on the key.
+- [x] When the plugin stops, `setup` can disarm the monitors.
+- [x] When a terminal started another, `setup` can list the child under it and open it with Enter.
+- [x] When `terminals` is given keys, `setup` can use them on the terminals in place of the usual ones.
+- [x] When the user presses the rename key on a terminal, `setup` can ask for a name and label the terminal with it.
+- [x] When `sidebar_keys` is still set, `setup` can tell the user where the keys go now.
+- [x] When a resource cannot be used, `setup` can tell the user why and leave Neovim as it is.

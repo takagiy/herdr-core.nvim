@@ -316,4 +316,169 @@ T["starts nothing when the picker returns no place"] = function ()
     MiniTest.expect.equality(child.lua_get("requests.run"), vim.NIL)
 end
 
+-- Defines on_line(text): puts the cursor on the sidebar line that holds the text, once it is there.
+local on_line = [[
+    function on_line(text)
+        return vim.wait(1000, function ()
+            for _, w in ipairs(vim.api.nvim_list_wins()) do
+                local buffer = vim.api.nvim_win_get_buf(w)
+                if vim.b[buffer].herdr_core_sidebar then
+                    for line, shown in ipairs(vim.api.nvim_buf_get_lines(buffer, 0, -1, false)) do
+                        if shown:find(text, 1, true) then
+                            vim.api.nvim_set_current_win(w)
+                            vim.api.nvim_win_set_cursor(w, { line, 0 })
+                            return true
+                        end
+                    end
+                end
+            end
+            return false
+        end)
+    end
+]]
+
+-- When `resources` holds a definition, `setup` can arm its monitor for each element its parent points at, list what it notifies there, and call its action with the item and its parent on the key.
+-- When the plugin stops, `setup` can disarm the monitors.
+T["lists what a resource's monitor notifies under a terminal and passes the item and its parent to its actions"] = function ()
+    -- Given a resource under each terminal that notifies one item when armed, with an action for Enter and a function on d
+    child.lua(fake)
+    child.lua(on_line)
+    child.lua(
+        [[
+        used, disarmed = {}, 0
+        local resources = require('herdr-core.resources')
+        local function note(name)
+            return function (ctx) used[#used + 1] = { name, ctx.item.props.number, ctx.parent.props.address } end
+        end
+        app = require('herdr-core').setup({ auto_insert = false, resources = {
+            resources.terminals(),
+            {
+                name = 'task',
+                parent = 'terminals[][]',
+                monitor = function ()
+                    return {
+                        arm = function (ctx)
+                            local name = 'task of ' .. ctx.parent.props.address
+                            ctx.notify({ resources.Item({ name = name, props = { number = 7 } }) })
+                        end,
+                        disarm = function () disarmed = disarmed + 1 end
+                    }
+                end,
+                actions = { open = note('open') },
+                keys = { use = 'open', d = note('d') }
+            }
+        } })
+    ]]
+    )
+    -- When Enter and d are pressed on the item listed under the terminal, and the plugin stops
+    child.lua(
+        [[listed = on_line('task of t1')
+        vim.fn.maparg('<CR>', 'n', false, true).callback()
+        vim.fn.maparg('d', 'n', false, true).callback()
+        app.stop()]]
+    )
+    -- Then the item is listed, both get the item as it was notified and the terminal it is under, and the monitor is disarmed
+    MiniTest.expect.equality(child.lua_get("listed"), true)
+    MiniTest.expect.equality(child.lua_get("used"), { { "open", 7, "t1" }, { "d", 7, "t1" } })
+    MiniTest.expect.equality(child.lua_get("disarmed"), 1)
+end
+
+-- When a terminal started another, `setup` can list the child under it and open it with Enter.
+T["lists a terminal's children under it and opens one with Enter"] = function ()
+    -- Given a terminal that started another
+    child.lua(fake)
+    child.lua(on_line)
+    child.lua(
+        [[
+        local hc = package.loaded['herdr-core.adapter.hc']
+        local watch = hc.watch
+        hc.watch = function (callback)
+            return watch(function (event)
+                if event.type == 'terminals_listed' then
+                    table.insert(event.terminals, {
+                        address = 't2', name = 'worker', parent = 't1', labels = { ['herdr.space'] = '/app' },
+                        folder = '/app', turn = 0, created_ms = 2
+                    })
+                end
+                callback(event)
+            end)
+        end
+        require('herdr-core').setup({ auto_insert = false })
+    ]]
+    )
+    -- When Enter is pressed on the child's line
+    child.lua([[listed = on_line('└ '); vim.fn.maparg('<CR>', 'n', false, true).callback()]])
+    child.lua([[vim.wait(1000, function () return vim.b.herdr_core_address == 't2' end)]])
+    -- Then the child was listed with a guide under its parent, and it is opened
+    MiniTest.expect.equality(child.lua_get("listed"), true)
+    MiniTest.expect.equality(child.lua_get("vim.b.herdr_core_address"), "t2")
+end
+
+-- When `terminals` is given keys, `setup` can use them on the terminals in place of the usual ones.
+-- When the user presses the rename key on a terminal, `setup` can ask for a name and label the terminal with it.
+-- When `sidebar_keys` is still set, `setup` can tell the user where the keys go now.
+T["takes the terminals' keys from their resource"] = function ()
+    -- Given the terminals' resource with Enter to open, R to rename and x to pin, and a leftover sidebar_keys
+    child.lua(fake)
+    child.lua(on_line)
+    child.lua(
+        [[
+        labels, messages = {}, {}
+        vim.notify = function (message) messages[#messages + 1] = message end
+        package.loaded['herdr-core.adapter.hc'].label = function (address, key, value, callback)
+            labels[#labels + 1] = { address, key, value }
+            callback(nil)
+        end
+        vim.ui.input = function (opts, on_confirm)
+            asked = opts.default
+            on_confirm('fix-login')
+        end
+        require('herdr-core').setup({
+            auto_insert = false,
+            sidebar_keys = { rename = 'r' },
+            resources = {
+                require('herdr-core.resources').terminals({ keys = { use = 'open', R = 'rename', x = 'pin' } })
+            }
+        })
+    ]]
+    )
+    -- When R and x are pressed on the terminal
+    child.lua(
+        [[on_line('t1')
+        for _, key in ipairs({ 'R', 'x' }) do
+            vim.fn.maparg(key, 'n', false, true).callback()
+        end
+        mapped = vim.tbl_map(
+            function (key) return vim.fn.maparg(key, 'n', false, true).callback ~= nil end, { 'r', 'p', '<CR>' }
+        )
+        told = messages[1] ~= nil and messages[1]:find('sidebar_keys is no longer used', 1, true) ~= nil]]
+    )
+    -- Then R asks for a name and labels the terminal, x pins it, the usual r and p are left unmapped, and the user is told
+    MiniTest.expect.equality(child.lua_get("asked"), "t1")
+    MiniTest.expect.equality(
+        child.lua_get("labels"), { { "t1", "herdr-core-nvim.name", "fix-login" }, { "t1", "herdr.pinned", "1" } }
+    )
+    MiniTest.expect.equality(child.lua_get("mapped"), { false, false, true })
+    MiniTest.expect.equality(child.lua_get("told"), true)
+end
+
+-- When a resource cannot be used, `setup` can tell the user why and leave Neovim as it is.
+T["tells the user and leaves Neovim as it is when a resource names no parent that exists"] = function ()
+    -- Given a resource whose parent names no resource
+    child.lua(fake)
+    child.lua([[messages = {}; vim.notify = function (message) messages[#messages + 1] = message end]])
+    local before = child.lua_get("#vim.api.nvim_list_wins()")
+    -- When setup runs
+    child.lua(
+        [[require('herdr-core').setup({ resources = { {
+            name = 'Foo',
+            parent = 'Bar[]',
+            monitor = function () return { arm = function () end, disarm = function () end } end
+        } } })]]
+    )
+    -- Then nothing is started and the message names the resource
+    MiniTest.expect.equality(child.lua_get("#vim.api.nvim_list_wins()"), before)
+    MiniTest.expect.equality(child.lua_get("requests.watch"), vim.NIL)
+    MiniTest.expect.equality(child.lua_get("messages"), { "herdr-core resources: Foo: no resource is named Bar" })
+end
 return T

@@ -37,6 +37,7 @@
 | adapter | `hc.lua` | `hc` の呼び出し（run、ls、label、attach）、`hc events` の受信、`hc connect` 経由の doc.get / doc.set |
 | | `git.lua` | パスから repo root を求める |
 | | `notifier.lua` | OS の通知。利用者が差し替えられる |
+| | `resources.lua` | リソースのモニターの開始と停止。モニターの通知を core の event に変換する |
 | ui | `terminal.lua` | `herdr://` のバッファーと `hc attach`、`BufReadCmd`、自動のターミナルモード |
 | | `layout.lua` | Neovim の配置の読み取りと反映 |
 | | `sidebar.lua` | 行の描画、キーとクリック、折りたたんだ帯 |

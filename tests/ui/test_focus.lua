@@ -14,6 +14,31 @@ T["reports focus gained and lost"] = function ()
     MiniTest.expect.equality(reports, { true, false, true })
 end
 
+-- When a terminal's buffer is entered, the watcher can report it as the one in front, and keep reporting it while the cursor is in the sidebar.
+T["reports the terminal in front and keeps it while the cursor is in the sidebar"] = function ()
+    -- Given a terminal buffer, a sidebar buffer and a focus listener
+    local focus = require("herdr-core.ui.focus")
+    local original = vim.api.nvim_get_current_buf()
+    local terminal, sidebar = vim.api.nvim_create_buf(false, true), vim.api.nvim_create_buf(false, true)
+    vim.b[terminal].herdr_core_address = "t1"
+    vim.b[sidebar].herdr_core_sidebar = true
+    vim.t.herdr_core_active_terminal = nil
+    local fronts = {}
+    local stop = focus.watch(function (value) fronts[#fronts + 1] = value.front or false end)
+    -- When the terminal is entered, then the sidebar, then a file
+    for _, buffer in ipairs({ terminal, sidebar, original }) do
+        local before = #fronts
+        vim.api.nvim_set_current_buf(buffer)
+        vim.wait(100, function () return #fronts > before end)
+    end
+    stop()
+    vim.t.herdr_core_active_terminal = nil
+    vim.api.nvim_buf_delete(terminal, { force = true })
+    vim.api.nvim_buf_delete(sidebar, { force = true })
+    -- Then the terminal is in front in itself and in the sidebar, and nothing is in front in the file
+    MiniTest.expect.equality(fronts, { false, "t1", "t1", false })
+end
+
 T["reports visible terminals when buffers change"] = function ()
     -- Given a buffer carrying a terminal address and a focus listener
     local focus = require("herdr-core.ui.focus")

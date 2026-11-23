@@ -92,21 +92,9 @@ end
 ---@field close  fun()
 ---@field toggle fun()
 
----@class HerdrCoreSidebarKeys
----@field activate?     string
----@field new_terminal? string
----@field rename?       string
----@field pin?          string
----@field unread?       string
-
 ---@param on_action? fun(action: string, row: HerdrCoreSidebarRow?, value: string?)
----@param keys?      HerdrCoreSidebarKeys
 ---@return HerdrCoreSidebarView
-function M.create(on_action, keys)
-    ---@type table<string, string>
-    local bound = vim.tbl_extend(
-        "force", { activate = "<CR>", new_terminal = "n", rename = "r", pin = "p", unread = "u" }, keys or {}
-    )
+function M.create(on_action)
     local buffer = vim.api.nvim_create_buf(false, true)
     vim.b[buffer].herdr_core_sidebar = true
     vim.bo[buffer].bufhidden = "hide"
@@ -138,8 +126,8 @@ function M.create(on_action, keys)
             return
         end
         local row = by_line[line]
-        -- Space headings have no button to press.
-        if not row or not on_action or row.kind == "space" then return end
+        -- Headings have no button to press.
+        if not row or not on_action or row.kind == "section" then return end
         if row.kind == "new_terminal" then
             on_action("new_terminal", row)
             return
@@ -158,15 +146,39 @@ function M.create(on_action, keys)
         index = math.max(1, math.min(#positions, index + direction * vim.v.count1))
         vim.api.nvim_win_set_cursor(0, { assert(positions[index]), 0 })
     end
-    for _, key in ipairs({ "j", "<Down>" }) do
-        vim.keymap.set("n", key, function () move(1) end, { buffer = buffer })
+    -- What a key does on a row that does not take it, by the key's code.
+    ---@type table<string, fun()?>
+    local plain = {}
+    for key, direction in pairs({ j = 1, ["<Down>"] = 1, k = -1, ["<Up>"] = -1 }) do
+        plain[vim.api.nvim_replace_termcodes(key, true, false, true)] = function () move(direction) end
     end
-    for _, key in ipairs({ "k", "<Up>" }) do
-        vim.keymap.set("n", key, function () move(-1) end, { buffer = buffer })
+    plain[vim.api.nvim_replace_termcodes("<CR>", true, false, true)] = function ()
+        activate(assert(vim.api.nvim_win_get_cursor(0)[1]))
     end
-    vim.keymap.set(
-        "n", bound.activate, function () activate(assert(vim.api.nvim_win_get_cursor(0)[1])) end, { buffer = buffer }
-    )
+    ---@type table<string, boolean>
+    local mapped = {}
+    -- Maps a key once. On a row that takes the key it is reported; elsewhere it does what it did.
+    ---@param key string
+    local function map(key)
+        local code = vim.api.nvim_replace_termcodes(key, true, false, true)
+        if mapped[code] then return end
+        mapped[code] = true
+        vim.keymap.set("n", key, function ()
+            local row = by_line[assert(vim.api.nvim_win_get_cursor(0)[1])]
+            for taken in pairs(row and row.keys or {}) do
+                if vim.api.nvim_replace_termcodes(taken, true, false, true) == code then
+                    if on_action then on_action("key", row, taken) end
+                    return
+                end
+            end
+            local otherwise = plain[code]
+            if otherwise then otherwise() end
+        end, { buffer = buffer }
+        )
+    end
+    for _, key in ipairs({ "j", "<Down>", "k", "<Up>", "<CR>" }) do
+        map(key)
+    end
     ---@type table<string, boolean>
     local clicks = {}
     for _, key in ipairs({ "<LeftRelease>", "<2-LeftRelease>", "<3-LeftRelease>", "<4-LeftRelease>" }) do
@@ -183,25 +195,6 @@ function M.create(on_action, keys)
             activate(mouse.line)
         end)
     end, namespace)
-    vim.keymap.set("n", bound.new_terminal, function ()
-        if on_action then on_action("new_terminal", by_line[assert(vim.api.nvim_win_get_cursor(0)[1])]) end
-    end, { buffer = buffer }
-    )
-    vim.keymap.set("n", bound.rename, function ()
-        local row = by_line[assert(vim.api.nvim_win_get_cursor(0)[1])]
-        if not row or row.kind ~= "terminal" then return end
-        require("herdr-core.ui.prompt").name(row.lines[1] or "", function (name)
-            if name ~= nil and on_action then on_action("rename", row, name) end
-        end)
-    end, { buffer = buffer }
-    )
-    for _, action in ipairs({ "pin", "unread" }) do
-        vim.keymap.set("n", bound[action], function ()
-            local row = by_line[assert(vim.api.nvim_win_get_cursor(0)[1])]
-            if row and row.kind == "terminal" and on_action then on_action(action, row) end
-        end, { buffer = buffer }
-        )
-    end
     ---@param requested? integer
     ---@return integer
     local function show(requested)
@@ -272,11 +265,10 @@ function M.create(on_action, keys)
     function render(rows, waiting)
         last_rows, last_waiting = rows, waiting or 0
         local lines = { collapsed and tostring(last_waiting) or "  HERDR" }
-        local current = vim.api.nvim_get_current_buf()
-        if current ~= buffer then vim.t.herdr_core_active_terminal = vim.b[current].herdr_core_address end
         -- The row under the cursor is selected only while the cursor is in the sidebar.
-        local cursor = current == buffer and vim.api.nvim_win_get_cursor(0)[1] or nil
-        local active = vim.t.herdr_core_active_terminal
+        local cursor = vim.api.nvim_get_current_buf() == buffer and vim.api.nvim_win_get_cursor(0)[1] or nil
+        -- Whether the rows last drawn at the top were items without a heading.
+        local flat = false
         ---@type { row: integer, group: string, start_col: integer?, end_col: integer?, priority: integer? } []
         local marks = { { row = 0, group = collapsed and "HerdrCoreMuted" or "HerdrCoreHeader" } }
         ---@type { line: integer, start_col: integer, end_col: integer } []
@@ -301,19 +293,25 @@ function M.create(on_action, keys)
         end
         for _, row in ipairs(collapsed and {} or rows) do
             if row.kind:find("^setup_") then goto continue end
-            if row.kind == "space" and #lines > 1 then lines[#lines + 1] = "" end
+            -- A blank line sets a section apart, and items at the top apart from the section before them.
+            if (row.kind == "section" or (row.top and not flat)) and #lines > 1 then lines[#lines + 1] = "" end
+            if row.kind == "section" then
+                flat = false
+            elseif row.top then
+                flat, space_mark = true, 0
+            end
             local start = #lines + 1
-            if row.kind == "space" then
+            local keys = row.keys or {}
+            for key in pairs(keys) do
+                if key ~= "use" then map(key) end
+            end
+            if row.kind == "section" then
                 local count = (row.waiting or 0) > 0 and "  · " .. row.waiting or ""
-                lines[#lines + 1] = "  " .. vim.fs.basename(row.root or "") .. count
+                lines[#lines + 1] = "  " .. (row.lines[1] or "") .. count
                 marks[#marks + 1] = { row = #lines - 1, group = "HerdrCoreSpace" }
                 space_mark = #marks
-            elseif row.kind == "machine" then
-                space_mark = 0
-                lines[#lines + 1] = (row.machine or "") .. (row.connected == false and " (disconnected)" or "")
-                marks[#marks + 1] = { row = #lines - 1, group = "HerdrCoreMachine" }
-            elseif row.kind == "terminal" and row.guide then
-                -- A child takes one line under its parent's name: guide, status, name, then the program dimmed.
+            elseif row.kind == "item" and row.guide then
+                -- A deeper item takes one line under its parent: guide, status, label, then the detail dimmed.
                 local guide = "    " .. row.guide
                 local head = guide .. (symbols[row.status] or " ") .. " "
                 local name = row.lines[1] or ""
@@ -331,7 +329,7 @@ function M.create(on_action, keys)
                     { row = #lines - 1, group = "HerdrCoreProgram", start_col = #head + #name + 2 }
                 })
                 space_of[start] = space_mark
-            elseif row.kind == "terminal" then
+            elseif row.kind == "item" then
                 local count = (row.waiting or 0) > 0 and "  · " .. row.waiting or ""
                 lines[#lines + 1] = "  " .. (symbols[row.status] or " ") .. " " .. (row.lines[1] or "") .. count
                 marks[#marks + 1] = {
@@ -345,12 +343,17 @@ function M.create(on_action, keys)
                     group = "HerdrCore" .. status:sub(1, 1):upper() .. status:sub(2),
                     end_col = #("  " .. (symbols[row.status] or " ") .. " ")
                 }
-                lines[#lines + 1] = "    " .. (row.lines[2] or "")
-                marks[#marks + 1] = { row = #lines - 1, group = "HerdrCoreProgram" }
+                -- An item without a detail takes the one line.
+                if row.lines[2] then
+                    lines[#lines + 1] = "    " .. row.lines[2]
+                    marks[#marks + 1] = { row = #lines - 1, group = "HerdrCoreProgram" }
+                end
                 space_of[start] = space_mark
             end
-            -- j and k stop on rows that do something; a space heading only labels its terminals.
-            if #lines >= start and row.kind ~= "space" then positions[#positions + 1] = start end
+            -- j and k stop on the items that take keys.
+            if row.kind == "item" and next(keys) ~= nil then
+                positions[#positions + 1] = start
+            end
             for line = start, #lines do
                 by_line[line] = row
             end
@@ -386,28 +389,32 @@ function M.create(on_action, keys)
         footer = #lines
         positions[#positions + 1] = footer
         buttons[#buttons + 1] = { line = footer, start_col = #lines[footer] - #toggle_button, end_col = #lines[footer] }
-        ---@type { first: integer, last: integer }?
-        local front
-        for line, row in pairs(by_line) do
-            if active and row.kind == "terminal" and row.address == active and space_of[line] then
-                front = { first = line, last = line + 1 }
-            end
-        end
-        ---@type { first: integer, last: integer }?
-        local selected
-        if cursor and (by_line[cursor] or cursor == footer) then
-            local row, first, last = by_line[cursor], cursor, cursor
+        -- The lines of the row that holds `line`.
+        ---@param line integer
+        ---@return { first: integer, last: integer }
+        local function extent(line)
+            local row, first, last = by_line[line], line, line
             while row and by_line[first - 1] == row do
                 first = first - 1
             end
             while row and by_line[last + 1] == row do
                 last = last + 1
             end
-            selected = { first = first, last = last }
+            return { first = first, last = last }
         end
-        -- The space holding the terminal in front takes the accent.
-        local owner = front and space_of[front.first]
-        if owner and owner > 0 then assert(marks[owner]).group = "HerdrCoreSpaceActive" end
+        -- The highlighted items, and the accent on the headings of the sections holding them.
+        ---@type { [1]: { first: integer, last: integer }, [2]: string, [3]: integer } []
+        local ranges = {}
+        for line, row in pairs(by_line) do
+            local owner = space_of[line]
+            if row.kind == "item" and row.highlighted and owner then
+                ranges[#ranges + 1] = { extent(line), "HerdrCoreActive", 90 }
+                if owner > 0 then assert(marks[owner]).group = "HerdrCoreSpaceActive" end
+            end
+        end
+        ---@type { first: integer, last: integer }?
+        local selected
+        if cursor and (by_line[cursor] or cursor == footer) then selected = extent(cursor) end
         local on_button = false
         for _, button in ipairs(buttons) do
             local chosen = selected and button.line >= selected.first and button.line <= selected.last
@@ -423,18 +430,18 @@ function M.create(on_action, keys)
         vim.bo[buffer].modifiable = true
         vim.api.nvim_buf_set_lines(buffer, 0, -1, false, lines)
         vim.api.nvim_buf_clear_namespace(buffer, namespace, 0, -1)
-        -- Gray marks the terminal in front, the accent the row under the cursor, which wins on the same row.
+        -- Gray marks the highlighted items, the accent the row under the cursor, which wins on the same row.
         -- On a row with a button, the button alone shows the selection.
-        local row = not on_button and selected or nil
-        for _, range in ipairs({ { front, "HerdrCoreActive", 90 }, { row, "HerdrCoreSelected", 95 } }) do
-            if range[1] then
-                vim.api.nvim_buf_set_extmark(buffer, namespace, range[1].first - 1, 0, {
-                    end_row = range[1].last,
-                    hl_group = range[2],
-                    hl_eol = true,
-                    priority = range[3]
-                })
-            end
+        if selected and not on_button then
+            ranges[#ranges + 1] = { selected, "HerdrCoreSelected", 95 }
+        end
+        for _, range in ipairs(ranges) do
+            vim.api.nvim_buf_set_extmark(buffer, namespace, range[1].first - 1, 0, {
+                end_row = range[1].last,
+                hl_group = range[2],
+                hl_eol = true,
+                priority = range[3]
+            })
         end
         for _, mark in ipairs(marks) do
             vim.api.nvim_buf_set_extmark(buffer, namespace, mark.row, mark.start_col or 0, {

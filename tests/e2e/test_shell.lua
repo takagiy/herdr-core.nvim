@@ -114,21 +114,21 @@ T["starts a shell in Neovim's folder when opened from a file window"] = function
 end
 
 local openers = MiniTest.new_set({ parametrize = { { "n" }, { "button" } } })
--- When a new shell is opened with `n` on a space heading, or with New terminal and that space chosen, it can start in that space's folder.
-T["starts a shell in the space of a heading"] = openers
+-- When a new shell is opened with `n` on a terminal, or with New terminal and that terminal's space chosen, it can start in that space's folder.
+T["starts a shell in the space of a terminal"] = openers
 
 ---@param method string
 openers["with n or the New terminal button"] = function (method)
-    -- Given: a space heading for an agent's folder
+    -- Given: a terminal in a space of its own, listed right under the space's heading
     local folder = session.root .. "/space"
     vim.fn.mkdir(folder, "p")
     session.spawn(folder)
     local child = session.editor()
     local line = session.row(child, vim.fs.basename(folder))
     local before = addresses()
-    -- When: the user presses n on the heading, or presses New terminal and chooses the space
+    -- When: the user presses n on the terminal, or presses New terminal and chooses the space
     if method == "n" then
-        child.type_keys(tostring(line) .. "G")
+        child.type_keys(tostring(line + 1) .. "G")
         child.type_keys("n")
     else
         child.type_keys(tostring(session.row(child, "New terminal")) .. "G")

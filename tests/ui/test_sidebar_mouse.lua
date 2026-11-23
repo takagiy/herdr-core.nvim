@@ -11,11 +11,11 @@ local T = MiniTest.new_set({
             actions = {}
             editor = vim.api.nvim_get_current_win()
             sidebar = require('herdr-core.ui.sidebar').create(function(action, row)
-                actions[#actions + 1] = { action, row and (row.address or row.root) }
+                actions[#actions + 1] = { action, row and row.id }
                 if select_terminal then vim.api.nvim_set_current_win(editor) end
             end)
             side = sidebar.show(32)
-            sidebar.render({ { kind='terminal', address='t1', lines={'review','claude'} } }, 0)
+            sidebar.render({ { kind='item', id='t1', lines={'review','claude'} } }, 0)
             vim.api.nvim_set_current_win(editor)
         ]]
             )
@@ -118,7 +118,7 @@ T["keeps the sidebar at its left edge when scrolled sideways"] = function ()
     -- Given a terminal name wider than the sidebar, and the cursor in the editor
     child.lua(
         [[
-        sidebar.render({ { kind = 'terminal', address = 't1', lines = { string.rep('long', 20), 'claude' } } }, 0)
+        sidebar.render({ { kind = 'item', id = 't1', lines = { string.rep('long', 20), 'claude' } } }, 0)
         vim.api.nvim_set_current_win(editor)
     ]]
     )

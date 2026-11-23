@@ -3,8 +3,8 @@ local T = MiniTest.new_set()
 
 ---@type HerdrCoreSidebarRow[]
 local rows = {
-    { kind = "space", root = "/app", waiting = 0, lines = {} },
-    { kind = "terminal", address = "t1", lines = { "build", "zsh" } },
+    { kind = "section", id = "/app", waiting = 0, lines = { "app" } },
+    { kind = "item", id = "t1", lines = { "build", "zsh" } },
     {
         kind = "setup_heading",
         group = "integration",

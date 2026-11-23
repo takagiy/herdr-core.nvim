@@ -237,20 +237,6 @@ T["asks to focus a chosen terminal's window or to show it"] = function ()
     MiniTest.expect.equality(policy, { { type = "show_terminal", terminal = "t2", placement = "vertical" } })
 end
 
--- When the user activates a machine heading, `update` can fold or unfold it.
-T["folds a machine and unfolds it again"] = function ()
-    -- Given a machine heading
-    local core = require("herdr-core.core.state")
-    local state = core.new()
-    -- When it is activated twice
-    local folded = core.update(state, { type = "machine_toggled", id = "machine:vps" })
-    local unfolded = core.update(folded, { type = "machine_toggled", id = "machine:vps" })
-    -- Then it is folded after the first and unfolded after the second
-    MiniTest.expect.equality(folded.folded["machine:vps"], true)
-    MiniTest.expect.equality(unfolded.folded["machine:vps"], nil)
-end
-
--- When a machine heading is folded, `view` can still count that machine's terminals waiting for the user.
 T["notifies and counts a child only when it needs the user"] = function ()
     -- Given a working lead, a working child, and a child whose turn is unseen, in a Neovim that is not focused
     local core = require("herdr-core.core.state")
@@ -272,18 +258,6 @@ T["notifies and counts a child only when it needs the user"] = function ()
     MiniTest.expect.equality(finished, {})
     MiniTest.expect.equality(blocked, { { type = "notify", terminal = "t2", name = "t2", status = "blocked" } })
     MiniTest.expect.equality(waiting, 0)
-end
-
-T["counts waiting terminals on a folded machine"] = function ()
-    -- Given a blocked terminal on a remote machine whose heading is folded
-    local core = require("herdr-core.core.state")
-    local state = core.new()
-    state.terminals["vps/t1"] = terminal("vps/t1", { machine = "vps", status = "blocked" })
-    state = core.update(state, { type = "machine_toggled", id = "machine:vps" })
-    -- When the view is taken
-    local _, _, waiting = core.view(state)
-    -- Then the hidden terminal still counts as waiting
-    MiniTest.expect.equality(waiting, 1)
 end
 
 -- When a saved layout names terminals that finished while no Neovim was running, `update` can restore it without them and save the result.
@@ -411,11 +385,11 @@ T["returns the sidebar rows and the waiting count in a stable order"] = function
     local function describe(list)
         local described = {}
         for _, row in ipairs(list) do
-            described[#described + 1] = row.kind .. ":" .. (row.address or row.root)
+            described[#described + 1] = row.kind .. ":" .. row.id
         end
         return described
     end
-    MiniTest.expect.equality(describe(rows), { "space:/app", "terminal:t1", "space:/docs", "terminal:t2" })
+    MiniTest.expect.equality(describe(rows), { "section:/app", "item:t1", "section:/docs", "item:t2" })
     MiniTest.expect.equality(waiting, 1)
     MiniTest.expect.equality(describe(again), describe(rows))
 end
@@ -445,6 +419,99 @@ T["returns sidebar requests as view effects"] = function ()
     local _, effects = core.update(core.new(), { type = "sidebar_requested", action = "toggle" })
     -- Then the UI is asked to carry it out
     MiniTest.expect.equality(effects, { { type = "sidebar", action = "toggle" } })
+end
+
+-- A monitor that does nothing: the core keeps it and never calls it.
+---@return HerdrCoreMonitor
+local function monitor()
+    return { arm = function () end, disarm = function () end }
+end
+
+-- When the focus changes, `update` can keep the terminal in front, and `view` can mark its row.
+T["marks the row of the terminal in front"] = function ()
+    -- Given two terminals
+    local core = require("herdr-core.core.state")
+    local state = core.new()
+    state.terminals.t1 = terminal("t1")
+    state.terminals.t2 = terminal("t2")
+    -- When the second comes to the front
+    local focused = core.update(state, { type = "focus_changed", focused = true, terminals = { "t2" }, front = "t2" })
+    local _, rows = core.view(focused)
+    -- Then only its row is marked
+    local marked = {}
+    for _, row in ipairs(rows) do
+        if row.highlighted then marked[#marked + 1] = row.id end
+    end
+    MiniTest.expect.equality(marked, { "t2" })
+end
+
+-- When an element a monitor is wanted for appears or changes, `update` can ask to arm the monitor there; when it goes, to disarm it and drop what was listed there.
+-- When what a monitor notified arrives, `update` can keep it, and `view` can list it.
+T["asks to arm monitors where they are wanted and to disarm them where the element is gone"] = function ()
+    -- Given a resource at the top and one under each terminal
+    local core = require("herdr-core.core.state")
+    local state = core.new({
+        resources = {
+            { name = "terminals" },
+            { name = "top", monitor = monitor },
+            { name = "task", parent = "terminals[][]", monitor = monitor }
+        }
+    })
+    ---@param effects table[]
+    ---@return table?
+    local function sync(effects)
+        return vim.tbl_filter(function (effect) return effect.type == "sync_monitors" end, effects)[1]
+    end
+    -- When a terminal starts, an item arrives under it, its status changes, an unrelated event comes, and it ends
+    local started, first = core.update(state, { type = "terminal_started", terminal = terminal("t1") })
+    local armed = assert(sync(first))
+    local task = assert(armed.arm[2])
+    local listed, second = core.update(started, {
+        type = "items_listed",
+        lists = { { resource = "task", parent = task.key, items = { { kind = "item", name = "a" } } } }
+    })
+    local _, rows = core.view(listed)
+    local changed, third = core.update(listed, {
+        type = "status_changed",
+        terminal = "t1",
+        status = "working",
+        status_ms = 2
+    })
+    local _, fourth = core.update(changed, { type = "sidebar_requested", action = "toggle" })
+    local ended, fifth = core.update(changed, { type = "terminal_ended", terminal = "t1" })
+    -- Then both are armed at the start, with the terminal for the one under it
+    MiniTest.expect.equality(
+        vim.tbl_map(
+            function (entry) return { entry.resource, entry.monitor == monitor, entry.parent and entry.parent.id } end,
+            armed.arm
+        ), { { "top", true }, { "task", true, "t1" } }
+    )
+    -- And the item is kept and listed under the terminal
+    MiniTest.expect.equality(sync(second), nil)
+    MiniTest.expect.equality(vim.tbl_map(function (row) return row.lines[1] end, rows), { "app", "t1", "a" })
+    -- And the one under the terminal is armed again when the terminal changes, and nothing is asked otherwise
+    MiniTest.expect.equality(
+        vim.tbl_map(function (entry) return entry.resource end, assert(sync(third)).arm), { "task" }
+    )
+    MiniTest.expect.equality(sync(fourth), nil)
+    -- And it is disarmed, with its item dropped, when the terminal ends
+    MiniTest.expect.equality(assert(sync(fifth)).disarm, { { resource = "task", key = task.key } })
+    MiniTest.expect.equality({ listed.items.task[task.key] ~= nil, ended.items.task[task.key] }, { true })
+end
+
+-- When a key is pressed on an item, `update` can ask to run what the key does there.
+T["asks to run what a key does on an item"] = function ()
+    -- Given the terminals' resource with an action for Enter
+    local core = require("herdr-core.core.state")
+    local open = function () end
+    local state = core.new({
+        resources = { { name = "terminals", actions = { open = open }, keys = { use = "open" } } }
+    })
+    local item = { kind = "item", name = "t1" }
+    -- When Enter is pressed on an item
+    local _, effects = core.update(state, { type = "key_pressed", resource = "terminals", key = "use", item = item })
+    -- Then the action is asked to run with the item
+    MiniTest.expect.equality(effects, { { type = "run_action", run = open, ctx = { item = item } } })
 end
 
 return T
