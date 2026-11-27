@@ -462,6 +462,37 @@ T["takes the terminals' keys from their resource"] = function ()
     MiniTest.expect.equality(child.lua_get("told"), true)
 end
 
+-- When a terminal comes to the front, `setup` can give its row the background of the terminal in front, and take it away when a file comes to the front.
+T["marks the row of the terminal in front and clears it for a file"] = function ()
+    -- Given a terminal in the sidebar, a buffer of that terminal and a file buffer
+    child.lua(fake)
+    child.lua(
+        [[
+        require('herdr-core').setup({ auto_insert = false })
+        terminal = vim.api.nvim_create_buf(true, true)
+        vim.b[terminal].herdr_core_address = 't1'
+        file = vim.api.nvim_create_buf(true, false)
+        function marked()
+            for _, buffer in ipairs(vim.api.nvim_list_bufs()) do
+                if vim.b[buffer].herdr_core_sidebar then
+                    for _, mark in ipairs(vim.api.nvim_buf_get_extmarks(buffer, -1, 0, -1, { details = true })) do
+                        if mark[4].hl_group == 'HerdrCoreActive' then return true end
+                    end
+                end
+            end
+            return false
+        end
+    ]]
+    )
+    -- When the terminal comes to the front, then the file
+    child.lua([[vim.cmd.wincmd('l'); vim.api.nvim_set_current_buf(terminal)]])
+    local shown = child.lua_get("vim.wait(1000, marked)")
+    child.lua([[vim.api.nvim_set_current_buf(file)]])
+    local cleared = child.lua_get("vim.wait(1000, function () return not marked() end)")
+    -- Then the terminal's row has the background, and loses it for the file
+    MiniTest.expect.equality({ shown, cleared }, { true, true })
+end
+
 -- When the user chooses an action from the menu of a terminal, `setup` can run it on that terminal.
 T["runs the action chosen from a terminal's menu"] = function ()
     -- Given a terminal in the sidebar
