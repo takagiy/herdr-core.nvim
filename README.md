@@ -11,6 +11,7 @@ A TUI client for [herdr-core](https://github.com/herdrdev/herdr-core), built on 
 - Sends OS notifications when an agent needs you or finishes.
 - Restores terminal layouts when Neovim restarts.
 - Automatically resumes agent conversations after a reboot.
+- Moves Neovim's cwd to the space of the terminal you switch to. Turn it off with `auto_cd = false`.
 - Built-in integrations for Claude Code, Codex, Antigravity CLI, Copilot CLI, Cursor CLI, Droid, Grok, Kilo Code, Mastra Code, omp, opencode, pi, Qoder CLI and Qwen Code. You can [write your own](#custom-integrations).
 - Lists your own items in the sidebar, under a terminal or in a section of their own. See [Custom resources](#custom-resources).
 
@@ -55,6 +56,8 @@ The plugin maps no global keys.
             auto_insert = true,
             -- Width of the sidebar.
             sidebar_width = 24,
+            -- Move Neovim's cwd to the space of the terminal that comes to the front.
+            auto_cd = true,
             -- What the sidebar lists, in order. See Custom resources below.
             resources = {
                 -- The spaces with their terminals, and what a key does on a terminal.

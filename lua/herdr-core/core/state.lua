@@ -30,6 +30,7 @@ local M = {}
 ---@field setup      HerdrCoreSetupState
 ---@field resuming   table<string, true>                        Terminals already asked to resume.
 ---@field resumable? HerdrCoreResumable
+---@field auto_cd?   boolean
 ---@field resources  HerdrCoreResource[]                        What the sidebar lists, in order.
 ---@field items      HerdrCoreListed                            What the resources' monitors notified.
 ---@field monitored  HerdrCoreWanted                            The elements monitors were last asked to be armed for.
@@ -77,6 +78,7 @@ local M = {}
 ---@field open?      fun(terminal: string): HerdrCoreOpenEffect
 ---@field resumable? HerdrCoreResumable
 ---@field resources? HerdrCoreResource[]
+---@field auto_cd?   boolean                                    Whether Neovim's cwd moves to the space of the terminal that comes to the front.
 
 ---@class HerdrCoreTerminalChosen
 ---@field type     'terminal_chosen'
@@ -84,7 +86,7 @@ local M = {}
 ---@field windows  table<string, string>
 
 ---@alias HerdrCoreEvent HerdrCoreSetupChecked | HerdrCoreSetupRequested | HerdrCoreSetupResult | HerdrCoreSetupDismissed | HerdrCoreSidebarRequested | HerdrCoreUnreadRequested | HerdrCoreNewTerminalRequested | HerdrCoreItemsListed | HerdrCoreKeyPressed | HerdrCoreActionChosen | HerdrCoreTerminalChosen | HerdrCoreFocusChanged | HerdrCoreTerminalsListed | HerdrCoreTerminalStarted | HerdrCoreForegroundChanged | HerdrCoreStatusChanged | HerdrCoreLabelsChanged | HerdrCoreTerminalEnded | HerdrCoreTerminalNamed | HerdrCoreTerminalPinned | HerdrCoreTurnChanged | HerdrCoreRepoRootFound | HerdrCoreFolderChanged | HerdrCoreLayoutLoaded | HerdrCoreLayoutChanged | HerdrCoreLayoutConflict
----@alias HerdrCoreEffect HerdrCoreResumeEffect | HerdrCoreInstallEffect | HerdrCoreSidebarEffect | HerdrCoreSetLabel | HerdrCoreSpaceEffect | HerdrCoreLayoutEffect | HerdrCoreOpenEffect | HerdrCoreNotify | HerdrCoreRunShell | HerdrCoreSyncMonitors | HerdrCoreRunAction
+---@alias HerdrCoreEffect HerdrCoreResumeEffect | HerdrCoreInstallEffect | HerdrCoreSidebarEffect | HerdrCoreSetLabel | HerdrCoreSpaceEffect | HerdrCoreLayoutEffect | HerdrCoreOpenEffect | HerdrCoreNotify | HerdrCoreRunShell | HerdrCoreSyncMonitors | HerdrCoreRunAction | HerdrCoreChangeCwd
 
 ---@class HerdrCoreUnknownEvent
 ---@field type 'unknown'
@@ -94,6 +96,12 @@ local M = {}
 ---@field focused   boolean
 ---@field terminals string[]
 ---@field front?    string          The terminal in front in the current tabpage.
+---@field cwd?      string          Neovim's global cwd.
+
+-- Moves Neovim's global cwd.
+---@class HerdrCoreChangeCwd
+---@field type   'change_cwd'
+---@field folder string
 
 ---@param options? HerdrCoreStateOptions
 ---@return HerdrCoreState
@@ -109,6 +117,7 @@ function M.new(options)
         resuming = {},
         open = options and options.open,
         resumable = options and options.resumable,
+        auto_cd = options and options.auto_cd,
         resources = options and options.resources or { { name = "terminals" } },
         items = {},
         monitored = {}
@@ -170,6 +179,16 @@ local function step(state, event)
                 local marks
                 read, marks = attention.observe(read, shown, event.focused, true)
                 vim.list_extend(effects, marks)
+            end
+        end
+        -- Each time a terminal comes to the front, Neovim's cwd moves to its space. Another machine's folders
+        -- are not on this one.
+        ---@type HerdrCoreTerminal?
+        local front = event.front and event.front ~= state.front and state.terminals[event.front] or nil
+        if state.auto_cd and front and not front.machine then
+            local folder = front.labels["herdr.space"] or front.folder
+            if folder ~= event.cwd then
+                effects[#effects + 1] = { type = "change_cwd", folder = folder }
             end
         end
         local focused = with(state, { focused = event.focused, shown = event.terminals, read = read })

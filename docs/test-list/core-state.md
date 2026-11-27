@@ -30,3 +30,4 @@ The core's single entry point.
 - [x] When what a monitor notified arrives, `update` can keep it, and `view` can list it.
 - [x] When a key is pressed on an item, `update` can ask to run what the key does there.
 - [x] When an action is chosen from an item's menu, `update` can ask to run it.
+- [x] When a terminal comes to the front, `update` can ask to move Neovim's cwd to its space, unless the cwd is there already, the terminal runs on another machine, or following is off.

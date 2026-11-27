@@ -4,6 +4,7 @@ local M = {}
 ---@field focused   boolean
 ---@field terminals string[]
 ---@field front?    string   The terminal in front in the current tabpage.
+---@field cwd       string   Neovim's global cwd.
 
 ---@param callback fun(value: HerdrCoreFocusSnapshot)
 ---@return fun()
@@ -27,7 +28,12 @@ function M.watch(callback)
         if not vim.b[current].herdr_core_sidebar then
             vim.t.herdr_core_active_terminal = vim.b[current].herdr_core_address
         end
-        callback({ focused = focused, terminals = terminals, front = vim.t.herdr_core_active_terminal })
+        callback({
+            focused = focused,
+            terminals = terminals,
+            front = vim.t.herdr_core_active_terminal,
+            cwd = vim.fn.getcwd(-1, -1)
+        })
     end
     vim.api.nvim_create_autocmd({ "FocusGained", "FocusLost" }, {
         group = group,
