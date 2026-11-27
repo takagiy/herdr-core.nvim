@@ -14,6 +14,18 @@ T["reports focus gained and lost"] = function ()
     MiniTest.expect.equality(reports, { true, false, true })
 end
 
+-- When the focus is reported, the watcher can report Neovim's global cwd with it.
+T["reports Neovim's global cwd"] = function ()
+    -- Given a focus listener
+    local focus = require("herdr-core.ui.focus")
+    local reports = {}
+    -- When it reports at the start
+    local stop = focus.watch(function (value) reports[#reports + 1] = value.cwd end)
+    stop()
+    -- Then the global cwd is reported
+    MiniTest.expect.equality(reports, { vim.fn.getcwd(-1, -1) })
+end
+
 -- When a terminal's buffer is entered, the watcher can report it as the one in front, and keep reporting it while the cursor is in the sidebar.
 T["reports the terminal in front and keeps it while the cursor is in the sidebar"] = function ()
     -- Given a terminal buffer, a sidebar buffer and a focus listener

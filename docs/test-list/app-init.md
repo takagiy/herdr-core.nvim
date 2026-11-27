@@ -22,3 +22,4 @@ Starting the plugin.
 - [x] When a resource cannot be used, `setup` can tell the user why and leave Neovim as it is.
 - [x] When a terminal comes to the front, `setup` can give its row the background of the terminal in front, and take it away when a file comes to the front.
 - [x] When the user chooses an action from the menu of a terminal, `setup` can run it on that terminal.
+- [x] When a terminal comes to the front, `setup` can move Neovim's cwd to its space; with `auto_cd = false` it can leave the cwd as it is.

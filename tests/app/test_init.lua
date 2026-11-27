@@ -493,6 +493,50 @@ T["marks the row of the terminal in front and clears it for a file"] = function 
     MiniTest.expect.equality({ shown, cleared }, { true, true })
 end
 
+-- When a terminal comes to the front, `setup` can move Neovim's cwd to its space; with `auto_cd = false` it can leave the cwd as it is.
+T["moves Neovim's cwd to the space of the terminal in front unless told not to"] = function ()
+    for _, follow in ipairs({ true, false }) do
+        -- Given a terminal whose space is a folder that exists, and the cwd elsewhere
+        child.restart({ "-u", "scripts/minimal_init.lua" })
+        child.lua(fake)
+        child.lua(
+            [[
+            space = vim.fs.normalize(vim.fn.tempname())
+            vim.fn.mkdir(space, 'p')
+            local hc = package.loaded['herdr-core.adapter.hc']
+            local watch = hc.watch
+            hc.watch = function (callback)
+                return watch(function (event)
+                    if event.type == 'terminals_listed' then
+                        event.terminals[1].labels['herdr.space'] = space
+                        event.terminals[1].folder = space
+                    end
+                    callback(event)
+                end)
+            end
+        ]]
+        )
+        child.lua("require('herdr-core').setup({ auto_insert = false, auto_cd = ... })", { follow })
+        child.lua(
+            [[
+            vim.wait(200, function () return false end)
+            home = vim.fs.normalize(vim.fn.expand('~'))
+            vim.cmd.cd(vim.fn.fnameescape(home))
+            vim.api.nvim_set_current_buf(vim.api.nvim_create_buf(true, false))
+            vim.wait(100, function () return false end)
+            terminal = vim.api.nvim_create_buf(true, true)
+            vim.b[terminal].herdr_core_address = 't1'
+        ]]
+        )
+        -- When the terminal comes to the front
+        child.lua([[vim.api.nvim_set_current_buf(terminal)]])
+        child.lua([[vim.wait(500, function () return vim.fs.normalize(vim.fn.getcwd(-1, -1)) == space end)]])
+        local cwd = child.lua_get("vim.fs.normalize(vim.fn.getcwd(-1, -1))")
+        -- Then the cwd is the space when following, and stays home otherwise
+        MiniTest.expect.equality(cwd, child.lua_get(follow and "space" or "home"))
+    end
+end
+
 -- When the user chooses an action from the menu of a terminal, `setup` can run it on that terminal.
 T["runs the action chosen from a terminal's menu"] = function ()
     -- Given a terminal in the sidebar

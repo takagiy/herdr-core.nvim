@@ -421,6 +421,42 @@ T["returns sidebar requests as view effects"] = function ()
     MiniTest.expect.equality(effects, { { type = "sidebar", action = "toggle" } })
 end
 
+-- When a terminal comes to the front, `update` can ask to move Neovim's cwd to its space, unless the cwd is there already, the terminal runs on another machine, or following is off.
+T["asks to move Neovim's cwd to the space of a terminal that comes to the front"] = function ()
+    -- Given a terminal in /app, one without a space label in /work, and one on another machine
+    local core = require("herdr-core.core.state")
+    local state = core.new({ auto_cd = true })
+    state.terminals.t1 = terminal("t1", { labels = { ["herdr.space"] = "/app" }, folder = "/app/src" })
+    state.terminals.t2 = terminal("t2", { folder = "/work" })
+    state.terminals["vps/t3"] = terminal("vps/t3", { machine = "vps", labels = { ["herdr.space"] = "/srv" } })
+    ---@param from   HerdrCoreState
+    ---@param front? string
+    ---@param cwd    string
+    ---@return HerdrCoreState, table[]
+    local function focus(from, front, cwd)
+        local next_state, effects = core.update(from, {
+            type = "focus_changed",
+            focused = true,
+            terminals = {},
+            front = front,
+            cwd = cwd
+        })
+        return next_state, vim.tbl_filter(function (effect) return effect.type == "change_cwd" end, effects)
+    end
+    -- When each comes to the front, t1 stays in front, a file comes to the front, and t1 comes back where the cwd is /app
+    local first, to_app = focus(state, "t1", "/home")
+    local _, kept = focus(first, "t1", "/home")
+    local file = focus(first, nil, "/home")
+    local _, to_work = focus(file, "t2", "/home")
+    local _, there = focus(file, "t1", "/app")
+    local _, remote = focus(file, "vps/t3", "/home")
+    local _, off = focus(core.new(), "t1", "/home")
+    -- Then the cwd moves to t1's space and to t2's folder, and nothing is asked otherwise
+    MiniTest.expect.equality(to_app, { { type = "change_cwd", folder = "/app" } })
+    MiniTest.expect.equality(to_work, { { type = "change_cwd", folder = "/work" } })
+    MiniTest.expect.equality({ kept, there, remote, off }, { {}, {}, {}, {} })
+end
+
 -- A monitor that does nothing: the core keeps it and never calls it.
 ---@return HerdrCoreMonitor
 local function monitor()

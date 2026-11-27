@@ -5,6 +5,7 @@ local stop_previous
 ---@class HerdrCoreConfig
 ---@field auto_insert?   boolean
 ---@field sidebar_width? integer
+---@field auto_cd?       boolean                                                                                            Whether Neovim's cwd moves to the space of the terminal that comes to the front; true when left out.
 ---@field resources?     HerdrCoreResource[]                                                                                What the sidebar lists, in order; `{ resources.terminals() }` when left out.
 ---@field open?          fun(terminal: string): HerdrCoreOpenEffect
 ---@field notify?        fun(name: string, status: string)
@@ -263,6 +264,9 @@ function M.setup(config)
         end,
         sync_monitors = function (effect) monitors.sync(effect) end,
         run_action = function (effect) effect.run(effect.ctx) end,
+        change_cwd = function (effect)
+            if vim.fn.isdirectory(effect.folder) == 1 then vim.cmd.cd(vim.fn.fnameescape(effect.folder)) end
+        end,
         sidebar = function (effect)
             if effect.action == "focus" then
                 vim.api.nvim_set_current_win(sidebar.show())
@@ -280,7 +284,8 @@ function M.setup(config)
                 return definition ~= nil and definition.matches_program ~= nil
                     and not definition.matches_program(program)
             end,
-            resources = listed
+            resources = listed,
+            auto_cd = config.auto_cd ~= false
         }),
         handlers = handlers,
         render = sidebar.render,
@@ -317,7 +322,13 @@ function M.setup(config)
     end, config.auto_insert)
     stops[#stops + 1] = layout.watch(function (value) dispatch({ type = "layout_changed", value = value }) end)
     stops[#stops + 1] = require("herdr-core.ui.focus").watch(function (value)
-        dispatch({ type = "focus_changed", focused = value.focused, terminals = value.terminals, front = value.front })
+        dispatch({
+            type = "focus_changed",
+            focused = value.focused,
+            terminals = value.terminals,
+            front = value.front,
+            cwd = value.cwd
+        })
     end)
     stops[#stops + 1] = loop.follow(function (callback, on_closed)
         return hc.watch(function (event, err)
