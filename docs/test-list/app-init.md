@@ -20,4 +20,5 @@ Starting the plugin.
 - [x] When the user presses the rename key on a terminal, `setup` can ask for a name and label the terminal with it.
 - [x] When `sidebar_keys` is still set, `setup` can tell the user where the keys go now.
 - [x] When a resource cannot be used, `setup` can tell the user why and leave Neovim as it is.
+- [x] When a terminal comes to the front, `setup` can give its row the background of the terminal in front, and take it away when a file comes to the front.
 - [x] When the user chooses an action from the menu of a terminal, `setup` can run it on that terminal.

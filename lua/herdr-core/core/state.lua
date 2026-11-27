@@ -172,8 +172,10 @@ local function step(state, event)
                 vim.list_extend(effects, marks)
             end
         end
-        return with(state, { focused = event.focused, shown = event.terminals, read = read, front = event.front }),
-            effects
+        local focused = with(state, { focused = event.focused, shown = event.terminals, read = read })
+        -- Set apart: a nil in the changes would leave the terminal that was in front before.
+        focused.front = event.front
+        return focused, effects
     end
     if event.type == "layout_loaded" or event.type == "layout_changed" or event.type == "layout_conflict" then
         -- Only the startup restore drops unknown terminals: a later load can name a terminal whose start event is still on its way.
